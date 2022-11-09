@@ -1,0 +1,81 @@
+{% extends 'layout.html' %}
+{% block body %}
+    <div class="wrapper">
+        <div class="scroll-view">
+            <div class="content">
+                <table class="status-table">
+                    <tr data-led>
+                        <th><a href="{{ url_for("scan") }}" class="button">Setup</a></th>
+                        <td><span class="led"></span></td>
+                        <td><span class="led"></span></td>
+                        <td><span class="led"></span></td>
+                        <td><span class="led"></span></td>
+                    </tr>
+                    <tr data-type>
+                        <th>Type</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-mode>
+                        <th>Mode</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-status>
+                        <th>Status</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-voltage>
+                        <th>Voltage</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-current>
+                        <th>Current</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-capacity>
+                        <th>Capacity</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-time>
+                        <th>Time</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-temperature>
+                        <th>Temperature</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    <tr data-resistance>
+                        <th>Resistance</th>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

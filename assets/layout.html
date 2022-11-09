@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <link href="{{ url_for("static", filename="css/styles.css") }}" rel="stylesheet" />
+    </head>
+    <body>
+        {% block body %}{% endblock %}
+
+        <script>
+            window.token = '{{ token }}';
+            window.socket_address = '{{ socket_address }}';
+        </script>
+        <script src="{{ url_for("static", filename="js/jquery.min.js") }}"></script>
+        <script src="{{ url_for("static", filename="js/app.js") }}"></script>
+    </body>
+</html>

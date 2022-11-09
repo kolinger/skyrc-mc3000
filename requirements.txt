@@ -1,0 +1,12 @@
+# mc3000ble
+bleak~=0.19.4
+pendulum~=2.1.2
+
+# gui
+ntdrt~=1.19.0
+pywebview~=3.7.0
+cefpython3==66.0
+Flask~=2.2.0
+appdirs~=1.4.4
+pyinstaller~=4.0
+notify-py~=0.3.3

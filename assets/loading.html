@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <style>
+            html {
+                height: 100%;
+            }
+
+            body {
+                height: 100%;
+                margin: 0;
+                font-family: sans-serif;
+                text-align: center;
+            }
+
+            .wrapper {
+                display: table;
+                width: 100%;
+                height: 100%;
+            }
+
+            .inner {
+                display: table-cell;
+                vertical-align: middle;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="inner">
+                <h1>loading<span class="dots"></span></h1>
+            </div>
+        </div>
+
+        <script>
+            var counter = 0;
+            setInterval(function () {
+                document.querySelector('.dots').innerText = '.'.repeat(counter);
+                counter++;
+                if (counter > 3) {
+                    counter = 0;
+                }
+            }, 250);
+
+            var load = function () {
+                var parameters = new URLSearchParams(window.location.search);
+                var url = decodeURIComponent(parameters.get('url'));
+                if (!window.pywebview) {
+                    return;
+                }
+                window.pywebview.api.is_up().then(function (value) {
+                    if (value) {
+                        window.location.href = url;
+                    }
+                });
+            };
+            setInterval(load, 100);
+            load();
+        </script>
+    </body>
+</html>
