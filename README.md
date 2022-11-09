@@ -6,6 +6,8 @@ Simple application to view status of SkyRC MC3000 over Bluetooth on desktop comp
 Written in Python, maybe cross-platform. 
 Windows x64 installer provided in [releases](https://github.com/kolinger/skyrc-mc3000/releases).
 
+![preview](resources/screenshot.png)
+
 Development
 -----------
 
@@ -14,3 +16,4 @@ Development
   - `pip install -r requirements.txt`
 - Building
   - `pyinstaller --noconfirm pyinstaller.spec`
+  - `makensis.exe installer.nsi`
