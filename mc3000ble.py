@@ -27,10 +27,11 @@ class MC3000Ble:
     types = {0: "LiIon", 1: "LiFe", 2: "LiIo4_35", 3: "NiMH", 4: "NiCd", 5: "NiZn", 6: "Eneloop", 7: "Ram", 8: "Batlto"}
     modes = {
         0: {0: "charge", 1: "refresh", 2: "storage", 3: "discharge", 4: "cycle"},
-        1: {0: "charge", 1: "refresh", 3: "discharge", 4: "cycle"},
+        1: {0: "charge", 1: "refresh", 2: "discharge", 3: "cycle"},
         2: {0: "charge", 1: "refresh", 2: "break in", 3: "discharge", 4: "cycle"},
     }
     modes_types_mapping = {
+        # mode_index: [type_index, type_index, ...]
         0: [0, 1, 2, 8],
         1: [5, 7],
         2: [3, 4, 6],
@@ -141,7 +142,7 @@ class MC3000Ble:
         return "none"
 
     def get_channel_request_data(self, channel_index):
-        payload = [15, 85, channel_index, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        payload = [15, self.BATTERY_INFO, channel_index, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.fill_checksum(payload)
         return bytearray(payload)
 
