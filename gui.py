@@ -94,10 +94,12 @@ class Server:
     def _background_scan(self):
         if self.service_thread is not None:
             self.service.stop()
+            self.last_update_time = None
             self.service_thread.join()
             self.service_thread = None
 
         async def run():
+            logging.info("scanning started")
             scanner = bleak.BleakScanner()
             devices = await scanner.discover()
             formatted = []
@@ -109,6 +111,7 @@ class Server:
             return formatted
 
         data = self.get_loop().run_until_complete(run())
+        logging.info("scanning done")
 
         results = ["Results:"]
         if len(data) == 0:
@@ -255,6 +258,7 @@ if __name__ == "__main__":
     config.setup_logging("MC3000")
 
     try:
+        logging.info("starting")
         server = Server("MC3000")
         Thread(target=server.run, daemon=True).start()
 

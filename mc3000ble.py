@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 from time import time
 
@@ -63,12 +64,14 @@ class MC3000Ble:
         self.receive_callback = None
 
     def run(self, receive_callback):
+        logging.info("service started")
         self.running = True
         self.receive_callback = receive_callback
         asyncio.run(self._loop_async())
 
     def stop(self):
         self.running = False
+        logging.info("service stopped")
 
     async def _loop_async(self):
         interval = float(self.interval)
