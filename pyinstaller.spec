@@ -2,7 +2,7 @@
 
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
-block_cipher = None
+debug = False
 
 a = Analysis(['gui.py'],
              binaries=collect_dynamic_libs('bleak'),
@@ -10,16 +10,16 @@ a = Analysis(['gui.py'],
                 ('assets', 'assets'),
              ],
              hiddenimports=['engineio.async_drivers.threading', 'pytzdata'],
-             hookspath=['pyinstaller'],
+             #hookspath=['pyinstaller'],
              runtime_hooks=[],
              excludes=[],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
-             cipher=block_cipher,
+             cipher=None,
              noarchive=False)
 
 pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
+             cipher=None)
 
 exe = EXE(pyz,
           a.scripts,
@@ -27,7 +27,7 @@ exe = EXE(pyz,
           exclude_binaries=True,
           name='mc3000ble',
           icon='assets/img/icon.ico',
-          debug=False,
+          debug=debug,
           bootloader_ignore_signals=False,
           strip=False,
           upx=False,

@@ -1,5 +1,5 @@
 # mc3000ble
-bleak~=0.20.2
+bleak~=0.21.1
 pendulum~=2.1.2
 
 # gui
@@ -8,5 +8,5 @@ pywebview~=3.7.0
 pythonnet~=3.0.3
 Flask~=2.2.5
 appdirs~=1.4.4
-pyinstaller~=4.10
+pyinstaller~=6.3.0
 notify-py~=0.3.3

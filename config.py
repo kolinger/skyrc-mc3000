@@ -5,8 +5,8 @@ import sys
 from appdirs import user_data_dir
 from ntdrt.log import LoggingSetup
 
-if getattr(sys, "frozen", False):
-    project_dir = os.path.dirname(sys.executable)
+if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
+    project_dir = sys._MEIPASS
 else:
     project_dir = os.path.dirname(__file__)
 project_dir = os.path.realpath(project_dir)
