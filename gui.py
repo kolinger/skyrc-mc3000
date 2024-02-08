@@ -263,11 +263,15 @@ if __name__ == "__main__":
 
         api = Api(*server.address)
         url = "http://%s:%s" % server.address
-        name = "loading.html?url=%s" % quote_plus(url)
-        url = os.path.join(config.project_dir, "assets", name)
+
+        path = os.path.join(config.project_dir, "assets", "loading.html")
+        with open(path, "r") as file:
+            body = file.read()
+        body = body.replace("%URL%", url)
+
         title = "%s - %s" % (server.title, "waiting for connection")
-        webview.create_window(title, url, js_api=api, width=780, height=340, text_select=True)
-        webview.start(debug="FLASK_DEBUG" in os.environ, gui="cef")
+        webview.create_window(title, html=body, js_api=api, width=780, height=340, text_select=True)
+        webview.start(debug="FLASK_DEBUG" in os.environ)
     except SystemExit:
         raise
     except KeyboardInterrupt:

@@ -5,7 +5,7 @@ pendulum~=2.1.2
 # gui
 ntdrt~=1.19.0
 pywebview~=3.7.0
-cefpython3==66.0
+pythonnet~=3.0.3
 Flask~=2.2.5
 appdirs~=1.4.4
 pyinstaller~=4.10

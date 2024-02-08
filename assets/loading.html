@@ -44,8 +44,7 @@
             }, 250);
 
             var load = function () {
-                var parameters = new URLSearchParams(window.location.search);
-                var url = decodeURIComponent(parameters.get('url'));
+                var url = '%URL%';
                 if (!window.pywebview) {
                     return;
                 }
