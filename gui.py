@@ -5,14 +5,13 @@ import logging
 import os
 import socket
 import sys
-from threading import Thread
 from time import sleep, time
-from urllib.parse import quote_plus
 
 import bleak
 import flask
 from flask import render_template, Flask, jsonify, request, redirect, url_for
 from notifypy import Notify
+from ntdrt.threads import SafeThread
 import pendulum
 import webview
 
@@ -77,7 +76,7 @@ class Server:
 
     def scan_trigger(self):
         if self.scan_thread is None:
-            self.scan_thread = Thread(target=self._background_scan, daemon=True)
+            self.scan_thread = SafeThread(target=self._background_scan, daemon=True)
             self.scan_thread.start()
         return jsonify({
             "status": "ok",
@@ -92,40 +91,49 @@ class Server:
         })
 
     def _background_scan(self):
-        if self.service_thread is not None:
-            self.service.stop()
-            self.last_update_time = None
-            self.service_thread.join()
-            self.service_thread = None
+        try:
+            if self.service_thread is not None:
+                self.service.stop()
+                self.service_thread.join()
+                self.service_thread = None
 
-        async def run():
-            logging.info("scanning started")
-            scanner = bleak.BleakScanner()
-            devices = await scanner.discover()
-            formatted = []
-            for device in devices:
-                formatted.append({
-                    "address": device.address,
-                    "name": device.name,
-                })
-            return formatted
+            self.disable_timeout()
 
-        data = self.get_loop().run_until_complete(run())
-        logging.info("scanning done")
+            async def run():
+                logging.info("scanning started")
+                scanner = bleak.BleakScanner()
+                devices = await scanner.discover()
+                formatted = []
+                for device in devices:
+                    formatted.append({
+                        "address": device.address,
+                        "name": device.name,
+                    })
+                return formatted
 
-        results = ["Results:"]
-        if len(data) == 0:
-            results.append("no device found, try again")
+            data = self.get_loop().run_until_complete(run())
+            logging.info("scanning done")
 
-        for device in data:
-            name = device["address"] + " (" + device["name"] + ")"
-            results.append("<a href=\"#\" data-address=\"" + device["address"] + "\">" + name + "</a>")
+            results = ["Results:"]
+            if len(data) == 0:
+                results.append("no device found, try again")
 
-        self.update_client_side({
-            "scan_results": "<br>".join(results),
-        })
+            for device in data:
+                if device["name"] is None:
+                    device["name"] = "unknown"
+                name = "%s (%s)" % (device["address"], device["name"])
+                results.append("<a href=\"#\" data-address=\"" + device["address"] + "\">" + name + "</a>")
 
-        self.scan_thread = None
+            self.update_client_side({
+                "scan_results": "<br>".join(results),
+            })
+
+            self.scan_thread = None
+        except Exception as e:
+            logging.exception(e)
+            self.update_client_side({
+                "scan_results": "error, please try again"
+            })
 
     def update_client_side(self, payload):
         for window in webview.windows:
@@ -170,12 +178,12 @@ class Server:
             return
 
         if self.service_thread is None:
-            self.service_thread = Thread(target=self._background_service, daemon=True)
+            self.service_thread = SafeThread(target=self._background_service, daemon=True)
             self.service_thread.start()
 
     def spawn_timeout(self):
         if self.timeout_thread is None:
-            self.timeout_thread = Thread(target=self._background_timeout, daemon=True)
+            self.timeout_thread = SafeThread(target=self._background_timeout, daemon=True)
             self.timeout_thread.start()
 
     def _background_service(self):
@@ -229,7 +237,7 @@ class Server:
             if self.last_update_time is not None:
                 if self.last_update_time < time() - 10:
                     if not self.waiting:
-                        self.set_title("%s - %s" % (self.title, "waiting for connection"))
+                        self.set_title_waiting()
                         self.notify.message = "Lost connection with charger!"
                         self.notify.send()
                     self.waiting = True
@@ -237,6 +245,14 @@ class Server:
                     self.waiting = False
 
             sleep(1)
+
+    def disable_timeout(self):
+        self.last_update_time = None
+        self.waiting = True
+        self.set_title_waiting()
+
+    def set_title_waiting(self):
+        self.set_title("%s - %s" % (self.title, "waiting for connection"))
 
 
 class Api:
@@ -260,7 +276,7 @@ if __name__ == "__main__":
     try:
         logging.info("starting")
         server = Server("MC3000")
-        Thread(target=server.run, daemon=True).start()
+        SafeThread(target=server.run, daemon=True).start()
 
         while not isinstance(server.address, tuple):
             sleep(0.010)
