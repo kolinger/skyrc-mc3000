@@ -23,7 +23,8 @@ class MC3000Ble:
     SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb"
     CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
-    BATTERY_INFO = 85
+    HEADER = 0x0F  # 15
+    BATTERY_INFO = 0x55  # 85
 
     types = {0: "LiIon", 1: "LiFe", 2: "LiIo4_35", 3: "NiMH", 4: "NiCd", 5: "NiZn", 6: "Eneloop", 7: "Ram", 8: "Batlto"}
     modes = {
@@ -76,27 +77,37 @@ class MC3000Ble:
     async def _loop_async(self):
         interval = float(self.interval)
         begin = time()
+        slots = range(0, 4)
         async with BleakClient(self.ble_address) as client:
             await client.start_notify(self.CHARACTERISTIC_UUID, self._async_callback)
 
             while self.running:
-                await client.write_gatt_char(self.CHARACTERISTIC_UUID, self.get_channel_request_data(0))
-                await asyncio.sleep(0.100)
-                await client.write_gatt_char(self.CHARACTERISTIC_UUID, self.get_channel_request_data(1))
-                await asyncio.sleep(0.100)
-                await client.write_gatt_char(self.CHARACTERISTIC_UUID, self.get_channel_request_data(2))
-                await asyncio.sleep(0.100)
-                await client.write_gatt_char(self.CHARACTERISTIC_UUID, self.get_channel_request_data(3))
+                for slot in slots:
+                    await asyncio.sleep(0.100)
+                    await client.write_gatt_char(self.CHARACTERISTIC_UUID, self.get_channel_request_data(slot))
+
                 await asyncio.sleep(interval - ((time() - begin) % interval))
 
             await client.stop_notify(self.CHARACTERISTIC_UUID)
 
     async def _async_callback(self, sender, data):
+        self.raw_receive_callback(data)
+
+        expected = self.calculate_checksum(data)
+        if expected != data[-1]:
+            logging.warning("checksum check failed, expected: %s, got: %s, payload: %s" % (
+                expected, data[-1], data,
+            ))
+            return
+
         if data[1] == self.BATTERY_INFO:
             battery_info = self.parse_battery_info(data)
             if self.receive_callback:
                 callback = self.receive_callback
                 callback(battery_info)
+
+    def raw_receive_callback(self, data):
+        pass  # virtual
 
     def parse_battery_info(self, data):
         battery_info = {
@@ -145,15 +156,21 @@ class MC3000Ble:
         return "none"
 
     def get_channel_request_data(self, channel_index):
-        payload = [15, self.BATTERY_INFO, channel_index, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        payload = [self.HEADER, self.BATTERY_INFO, channel_index]
+        while len(payload) < 20:
+            payload.append(0x00)
         self.fill_checksum(payload)
         return bytearray(payload)
 
     def fill_checksum(self, payload):
+        payload[-1] = self.calculate_checksum(payload)
+
+    def calculate_checksum(self, payload):
+        payload = payload[:-1]
         sum = 0
         for byte in payload:
             sum += byte
-        payload[-1] = sum & 255
+        return sum & 255
 
 
 class DebugPrint:
