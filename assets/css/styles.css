@@ -24,40 +24,15 @@ body {
     display: table;
 }
 
-.button {
-    display: inline-block;
-    padding: 6px 12px;
-    background: #fff;
-    border: 1px solid #ccc;
-    color: #333;
-    font-size: 14px;
-    font-weight: 400;
-    text-decoration: none;
-    vertical-align: top;
-    cursor: pointer;
-}
-
-.button:focus {
-    outline: 0;
-}
-
-.button:hover {
-    background: #e6e6e6;
-    border-color: #adadad;
-}
-
-.button.used {
-    border-color: #eee;
-    color: #adadad;
-}
-
-.button.disabled {
-    background: #e6e6e6;
-    border-color: #adadad;
-    cursor: not-allowed;
+.alert {
+    margin: 0 0 10px 0;
 }
 
 /*--------------------- layout ---------------------*/
+
+.wrapper {
+    height: 100%;
+}
 
 .scroll-view {
     width: 100%;
@@ -119,4 +94,88 @@ body {
 .scan-wrapper .scan-result {
     margin: 10px 0 0 0;
     line-height: 1.5em;
+}
+
+/*--------------------- profiles ---------------------*/
+
+.profiles-mode .actions {
+    margin: 5px 0 15px 0;
+}
+
+.profiles-mode .profile-list td {
+    vertical-align: middle;
+}
+
+.profiles-mode .profile-list .table {
+    margin-bottom: 10px;
+}
+
+.profiles-mode .profile-list tr[data-toggle-checkbox] td {
+    cursor: pointer;
+}
+
+.profiles-mode .profile-list .position a {
+    padding: 4px 5px;
+}
+
+.profiles-mode .profile-list .action {
+    margin: 0 0 20px 0;
+    text-align: right;
+}
+
+/*--------------------- flashes ---------------------*/
+
+.flashes {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+}
+
+.flashes .alert {
+    padding: 0 10px 10px 10px;
+    margin: 0;
+}
+
+.flashes .alert .content {
+    display: block;
+    position: relative;
+    padding: 10px 30px 8px 10px;
+    background: #d9edf7;
+    border: 1px solid #bce8f1;
+    color: #31708f;
+    vertical-align: top;
+}
+
+.flashes .alert .close {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #000;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1em;
+    vertical-align: top;
+    opacity: 0.2;
+    cursor: pointer;
+    outline: none;
+}
+
+.flashes .alert .close:hover {
+    opacity: 1;
+}
+
+.flashes .alert.danger .content {
+    background-color: #f2dede;
+    border-color: #ebccd1;
+    color: #a94442;
+}
+
+.flashes .alert.success .content {
+    background-color: #dff0d8;
+    border-color: #d6e9c6;
+    color: #3c763d;
 }

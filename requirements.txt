@@ -2,6 +2,9 @@
 bleak~=0.21.1
 pendulum~=2.1.2
 
+# mc3000usb
+pyusb~=1.2.1
+
 # gui
 ntdrt~=1.19.0
 pywebview~=3.7.0

@@ -18,6 +18,7 @@ import webview
 import config
 from config import project_dir
 from mc3000ble import MC3000Ble
+from profiles import ProfilesController
 
 
 class Server:
@@ -31,25 +32,38 @@ class Server:
     scan_thread = None
     loop = None
     previous = {}
+    variables = {}
+    window = None
 
-    def __init__(self, title):
+    def __init__(self, title, profiles_mode=False):
         self.title = title
+        self.profiles_mode = profiles_mode
         self.config = config.Config()
 
         gui_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
         if not os.path.exists(gui_dir):
             gui_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
+        secret_key = self.config.read("secret_key")
+        if not secret_key:
+            secret_key = os.urandom(12).hex()
+            self.config.write("secret_key", secret_key)
+
         self.app = app = Flask(__name__, static_folder=gui_dir, template_folder=gui_dir)
         app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 1
+        app.config["SECRET_KEY"] = secret_key
 
         app.context_processor(self.context_processor)
         app.after_request(self.after_request)
 
-        app.add_url_rule("/", "index", self.index)
-        app.add_url_rule("/scan", "scan", self.scan)
-        app.add_url_rule("/scan/trigger", "scan_trigger", self.scan_trigger)
-        app.add_url_rule("/scan/select", "scan_select", self.scan_select)
+        if self.profiles_mode:
+            self.profiles_controller = ProfilesController(self, self.config)
+            self.profiles_controller.register(app)
+        else:
+            app.add_url_rule("/", "index", self.index)
+            app.add_url_rule("/scan", "scan", self.scan)
+            app.add_url_rule("/scan/trigger", "scan_trigger", self.scan_trigger)
+            app.add_url_rule("/scan/select", "scan_select", self.scan_select)
 
         self.notify = Notify(
             default_notification_title="SkyRC MC3000 status update",
@@ -58,9 +72,11 @@ class Server:
         )
 
     def context_processor(self):
-        return {
+        variables: dict = {
             "url_for": self.url_for,
         }
+        variables.update(self.variables)
+        return variables
 
     def after_request(self, response):
         response.headers["Cache-Control"] = "no-store"
@@ -169,8 +185,9 @@ class Server:
 
         self.address = (host, port)
 
-        self.spawn_service()
-        self.spawn_timeout()
+        if not self.profiles_mode:
+            self.spawn_service()
+            self.spawn_timeout()
         self.app.run(host=host, port=port, threaded=True, use_reloader=False)
 
     def spawn_service(self):
@@ -275,7 +292,11 @@ if __name__ == "__main__":
 
     try:
         logging.info("starting")
-        server = Server("MC3000")
+
+        argument = sys.argv[1] if len(sys.argv) > 1 else None
+        profiles_mode = argument == "profiles"
+
+        server = Server("MC3000", profiles_mode=profiles_mode)
         SafeThread(target=server.run, daemon=True).start()
 
         while not isinstance(server.address, tuple):
@@ -289,8 +310,16 @@ if __name__ == "__main__":
             body = file.read()
         body = body.replace("%URL%", url)
 
-        title = "%s - %s" % (server.title, "waiting for connection")
-        webview.create_window(title, html=body, js_api=api, width=780, height=340, text_select=True)
+        if profiles_mode:
+            width = 780
+            height = 780
+            title = "%s Profiles" % server.title
+        else:
+            width = 780
+            height = 370
+            title = "%s - waiting for connection" % server.title
+        window = webview.create_window(title, html=body, js_api=api, width=width, height=height, text_select=True)
+        server.window = window
         webview.start(debug="FLASK_DEBUG" in os.environ)
     except SystemExit:
         raise

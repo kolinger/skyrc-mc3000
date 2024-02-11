@@ -6,7 +6,10 @@ App.prototype.bind = function () {
 
     var adjustScrollHeight = function () {
         var height = $(window).height();
-        height -= $('.top').outerHeight(true);
+        var top = $('.top');
+        if (top.length) {
+            height -= top.outerHeight(true);
+        }
         $('.scroll-view').height(height + 'px');
     };
     adjustScrollHeight();
@@ -52,6 +55,24 @@ App.prototype.bind = function () {
             window.location.href = '/';
         });
     });
+
+    $(document).on('click', '[data-confirm]', function (e) {
+        e.preventDefault();
+        var control = $(this);
+        if (confirm(control.attr('data-confirm'))) {
+            window.location.href = control.attr('data-href');
+        }
+    });
+
+    $(document).on('click', 'tr[data-toggle-checkbox]', function (e) {
+        if ($(e.target).is('td')) {
+            var control = $(this);
+            var input = control.closest('tr').find('input[type="checkbox"]');
+            input.prop('checked', !input.prop('checked'));
+        }
+    });
+
+    self.bindProfilesMode();
 };
 
 App.prototype.update = function (data) {
@@ -80,6 +101,52 @@ App.prototype.update = function (data) {
     }
 };
 
+App.prototype.bindProfilesMode = function () {
+    var self = this;
+    var wrapper = $('.wrapper.profiles-mode');
+    if (!wrapper.length) {
+        return;
+    }
+
+    $(document).on('input', '[data-profiles-form] input', function () {
+        var control = $(this);
+        var form = control.closest('form');
+        form.find('[type="submit"]').attr('disabled', null);
+    });
+
+    $(document).on('click', '[data-profiles-form] [data-move]', function (e) {
+        e.preventDefault();
+        var control = $(this);
+        var row = control.closest('tr');
+        if (control.attr('data-move') === 'up') {
+            row.prev().before(row);
+        } else {
+            row.next().after(row);
+        }
+        var form = control.closest('form');
+        form.find('[type="submit"]').attr('disabled', null);
+    });
+
+    $(document).on('click', '[data-show-details]', function (e) {
+        e.preventDefault();
+        var control = $(this);
+        var parent = control.closest('[data-id]');
+        $('.modal[data-id="' + parent.attr('data-id') + '"]').modal('show');
+    });
+
+    $(document).on('click', '[data-set-slot]', function (e) {
+        e.preventDefault();
+        var control = $(this);
+        self.request('get', control.attr('data-set-slot'), null, function (payload) {
+            if (payload.hasOwnProperty('success')) {
+                self.flashMessage(payload.success, 'success');
+            } else {
+                self.flashMessage(payload.error, 'danger');
+            }
+        })
+    });
+};
+
 App.prototype.request = function (method, endpoint, data, callback) {
     var config = {
         method: method,
@@ -97,6 +164,24 @@ App.prototype.request = function (method, endpoint, data, callback) {
     }
 
     $.ajax(endpoint, config);
+};
+
+App.prototype.flashMessage = function (message, type) {
+    var wrapper = $('.flashes');
+    var alert = $('<div class="alert"></div>');
+    alert.addClass(type);
+    var content = $('<div class="content"></div>');
+    content.text(message);
+    alert.append(content);
+    var close = $('<button class="close">&times;</button>');
+    close.on('click', function () {
+        alert.remove();
+    });
+    setTimeout(function () {
+        alert.remove();
+    }, 5000)
+    content.append(close);
+    wrapper.append(alert);
 };
 
 $(function () {

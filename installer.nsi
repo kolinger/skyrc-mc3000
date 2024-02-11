@@ -29,6 +29,7 @@ Section "Dummy Section" SecDummy
     CreateDirectory "$SMPROGRAMS\MC3000 BLE"
     CreateShortcut "$SMPROGRAMS\MC3000 BLE\Uninstall.lnk" "$INSTDIR\uninstall.exe"
     CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC3000 BLE.lnk" "$INSTDIR\mc3000ble.exe"
+    CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC3000 Profiles.lnk" "$INSTDIR\mc3000ble.exe" "profiles"
 
     ; reinstall helper
     WriteRegStr HKLM Software\mc3000ble "Install_Dir" "$INSTDIR"

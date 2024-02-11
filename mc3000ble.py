@@ -6,6 +6,8 @@ from time import time
 from bleak import BleakClient
 import pendulum
 
+from shared import calculate_checksum
+
 
 class MC3000Ble:
     """
@@ -93,7 +95,7 @@ class MC3000Ble:
     async def _async_callback(self, sender, data):
         self.raw_receive_callback(data)
 
-        expected = self.calculate_checksum(data)
+        expected = calculate_checksum(data[:-1])
         if expected != data[-1]:
             logging.warning("checksum check failed, expected: %s, got: %s, payload: %s" % (
                 expected, data[-1], data,
@@ -163,14 +165,7 @@ class MC3000Ble:
         return bytearray(payload)
 
     def fill_checksum(self, payload):
-        payload[-1] = self.calculate_checksum(payload)
-
-    def calculate_checksum(self, payload):
-        payload = payload[:-1]
-        sum = 0
-        for byte in payload:
-            sum += byte
-        return sum & 255
+        payload[-1] = calculate_checksum(payload[:-1])
 
 
 class DebugPrint:
