@@ -13,13 +13,7 @@ App.prototype.bind = function () {
         $('.scroll-view').height(height + 'px');
     };
     adjustScrollHeight();
-    var scrollAdjustTimeout = null;
-    $(window).on('resize', function () {
-        if (scrollAdjustTimeout) {
-            clearTimeout(scrollAdjustTimeout);
-        }
-        scrollAdjustTimeout = setTimeout(adjustScrollHeight, 100);
-    });
+    $(window).on('resize', adjustScrollHeight);
 
     var interval = 250;
     var loading = function () {

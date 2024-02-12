@@ -13,3 +13,4 @@ Flask~=2.2.5
 appdirs~=1.4.4
 pyinstaller~=6.3.0
 notify-py~=0.3.3
+screeninfo~=0.8.1

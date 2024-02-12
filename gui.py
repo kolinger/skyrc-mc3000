@@ -13,6 +13,7 @@ from flask import render_template, Flask, jsonify, request, redirect, url_for
 from notifypy import Notify
 from ntdrt.threads import SafeThread
 import pendulum
+from screeninfo import screeninfo
 import webview
 
 import config
@@ -271,6 +272,88 @@ class Server:
     def set_title_waiting(self):
         self.set_title("%s - %s" % (self.title, "waiting for connection"))
 
+    def run_window(self):
+        api = Api(*server.address)
+        url = "http://%s:%s" % server.address
+
+        path = os.path.join(config.project_dir, "assets", "loading.html")
+        with open(path, "r") as file:
+            body = file.read()
+        body = body.replace("%URL%", url)
+
+        parameters = {
+            "html": body,
+            "js_api": api,
+            "text_select": True,
+        }
+        if profiles_mode:
+            parameters["width"] = self.config.read("profiles_window_width", 780)
+            parameters["height"] = self.config.read("profiles_window_height", 780)
+            parameters["x"] = self.config.read("profiles_window_x", None)
+            parameters["y"] = self.config.read("profiles_window_y", None)
+            parameters["title"] = "%s Profiles" % server.title
+        else:
+            parameters["width"] = self.config.read("monitor_window_width", 780)
+            parameters["height"] = self.config.read("monitor_window_height", 370)
+            parameters["x"] = self.config.read("monitor_window_x", None)
+            parameters["y"] = self.config.read("monitor_window_y", None)
+            parameters["title"] = "%s - waiting for connection" % server.title
+
+        self.clamp_coordinates(parameters)
+
+        self.window = webview.create_window(**parameters)
+        self.window.events.closing += self.on_close
+        webview.start(debug="FLASK_DEBUG" in os.environ)
+
+    def on_close(self):
+        prefix = "profiles" if self.profiles_mode else "monitor"
+        self.config.write("%s_window_width" % prefix, self.window.width, flush=False)
+        self.config.write("%s_window_height" % prefix, self.window.height, flush=False)
+        self.config.write("%s_window_x" % prefix, self.window.x, flush=False)
+        self.config.write("%s_window_y" % prefix, self.window.y, flush=False)
+        self.config.flush()
+
+    def clamp_coordinates(self, parameters):
+        # not ideal, this doesn't consider monitors with different resolutions, but it's better than nothing
+        extreme = {
+            "left": 0,
+            "right": 0,
+            "top": 0,
+            "bottom": 0,
+        }
+
+        for monitor in screeninfo.get_monitors():
+            if monitor.x < extreme["left"]:
+                extreme["left"] = monitor.x
+
+            right = monitor.x + monitor.width
+            if right > extreme["right"]:
+                extreme["right"] = right
+
+            if monitor.y < extreme["top"]:
+                extreme["top"] = monitor.y
+
+            bottom = monitor.y + monitor.height
+            if bottom > extreme["bottom"]:
+                extreme["bottom"] = bottom
+
+        if parameters["x"] is None or parameters["y"] is None:
+            out_of_bounds = True
+        else:
+            out_of_bounds = False
+            if parameters["x"] < extreme["left"]:
+                out_of_bounds = True
+            elif parameters["x"] + parameters["width"] > extreme["right"]:
+                out_of_bounds = True
+            elif parameters["y"] < extreme["top"]:
+                out_of_bounds = True
+            elif parameters["y"] + parameters["height"] > extreme["bottom"]:
+                out_of_bounds = True
+
+        if out_of_bounds:
+            parameters["x"] = None
+            parameters["y"] = None
+
 
 class Api:
     def __init__(self, url, port):
@@ -302,25 +385,7 @@ if __name__ == "__main__":
         while not isinstance(server.address, tuple):
             sleep(0.010)
 
-        api = Api(*server.address)
-        url = "http://%s:%s" % server.address
-
-        path = os.path.join(config.project_dir, "assets", "loading.html")
-        with open(path, "r") as file:
-            body = file.read()
-        body = body.replace("%URL%", url)
-
-        if profiles_mode:
-            width = 780
-            height = 780
-            title = "%s Profiles" % server.title
-        else:
-            width = 780
-            height = 370
-            title = "%s - waiting for connection" % server.title
-        window = webview.create_window(title, html=body, js_api=api, width=width, height=height, text_select=True)
-        server.window = window
-        webview.start(debug="FLASK_DEBUG" in os.environ)
+        server.run_window()
     except SystemExit:
         raise
     except KeyboardInterrupt:
