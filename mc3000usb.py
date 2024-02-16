@@ -162,7 +162,7 @@ class SlotSettings:
 
         for name, value in self.get_fields().items():
             if value is None and name in ["id"]:
-                raise JsonException("field '%s' is missing")
+                raise JsonException("field '%s' is missing" % name)
 
         try:
             MC3000Encoder().prepare_slot_settings_write(self)
