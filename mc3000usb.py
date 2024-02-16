@@ -161,7 +161,7 @@ class SlotSettings:
                 setattr(self, name, value)
 
         for name, value in self.get_fields().items():
-            if value is None and name in ["id"]:
+            if value is None and name not in ["id"]:
                 raise JsonException("field '%s' is missing" % name)
 
         try:
