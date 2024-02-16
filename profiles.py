@@ -68,15 +68,14 @@ class ProfilesController:
 
             profile: SlotSettings
             for profile in self.memory["current"]:
-                slot = profile.slot_number
-                if "save-slot-%s" % slot not in request.form:
+                if "save-id-%s" % profile.id not in request.form:
                     continue
 
-                name_key = "name-slot-%s" % slot
+                name_key = "name-id-%s" % profile.id
                 if name_key in request.form:
                     profile.name = request.form[name_key]
 
-                profile.id = str(uuid.uuid4())
+                profile.id = self.generate_id()
                 self.storage.write(profile.id, profile.get_fields())
 
                 message = "Profile '%s' was successfully saved as '%s'" % (
@@ -94,7 +93,9 @@ class ProfilesController:
             for slot in range(0, 4):
                 coms.write(encoder.prepare_slot_settings_read(slot))
                 data = coms.read()
-                profiles.append(encoder.decode_slot_settings(data))
+                profile = encoder.decode_slot_settings(data)
+                profile.id = self.generate_id()
+                profiles.append(profile)
 
             profiles.sort(key=lambda item: item.slot_number)
 
@@ -116,15 +117,14 @@ class ProfilesController:
 
             profile: SlotSettings
             for profile in self.memory["current"]:
-                slot = profile.slot_number
-                if "save-%s" % slot not in request.form:
+                if "save-id-%s" % profile.id not in request.form:
                     continue
 
-                name_key = "name-slot-%s" % slot
+                name_key = "name-id-%s" % profile.id
                 if name_key in request.form:
                     profile.name = request.form[name_key]
 
-                profile.id = str(uuid.uuid4())
+                profile.id = self.generate_id()
                 self.storage.write(profile.id, profile.get_fields())
 
                 message = "Profile '%s' was successfully saved as '%s'" % (
@@ -148,6 +148,7 @@ class ProfilesController:
                 with open(path, "r") as file:
                     profile = SlotSettings()
                     profile.from_json(file.read())
+                    profile.id = self.generate_id()
                     profiles.append(profile)
             except Exception as e:
                 message = self.handle_usb_exception(e)
@@ -231,3 +232,6 @@ class ProfilesController:
         else:
             logging.exception(e)
             return "Unexpected error occurred: %s" % e
+
+    def generate_id(self):
+        return str(uuid.uuid4())

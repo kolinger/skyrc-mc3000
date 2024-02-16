@@ -48,10 +48,10 @@
                                             {% endif %}
                                             <td>{{ profile.get_description() }}</td>
                                             <td>
-                                                <input type="text" class="form-control" name="name-slot-{{ profile.slot_number }}" value="{{ profile.name if profile.name }}" autocomplete="abcd" />
+                                                <input type="text" class="form-control" name="name-id-{{ profile.id }}" value="{{ profile.name if profile.name }}" autocomplete="abcd" />
                                             </td>
                                             <td>
-                                                <input type="checkbox" name="save-slot-{{ profile.slot_number }}" />
+                                                <input type="checkbox" name="save-id-{{ profile.id }}" />
                                             </td>
                                         </tr>
                                     {% endfor %}
