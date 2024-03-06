@@ -26,14 +26,16 @@ class MC3000Usb:
     def open(self):
         if self.device is None:
             self.device = usb.core.find(idVendor=self.VID, idProduct=self.PID)
+
+            if not self.device:
+                raise DeviceNotFoundException()
+
             # MC3000 seems to be already configured by OS but pyusb says to always call set_configuration() so we will
             try:
                 self.device.get_active_configuration()  # will throw if not set
             except USBError:
                 self.device.set_configuration()
 
-            if not self.device:
-                raise DeviceNotFoundException()
 
     def write(self, data):
         self.open()

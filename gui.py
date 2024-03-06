@@ -291,7 +291,7 @@ class Server:
             parameters["height"] = self.config.read("profiles_window_height", 780)
             parameters["x"] = self.config.read("profiles_window_x", None)
             parameters["y"] = self.config.read("profiles_window_y", None)
-            parameters["title"] = "%s Profiles" % server.title
+            parameters["title"] = "%s USB Profiles" % server.title
         else:
             parameters["width"] = self.config.read("monitor_window_width", 780)
             parameters["height"] = self.config.read("monitor_window_height", 370)

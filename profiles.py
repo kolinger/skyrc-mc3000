@@ -227,11 +227,12 @@ class ProfilesController:
         return re.sub(r"[-\s]+", "-", value).strip("-_")
 
     def handle_usb_exception(self, e):
+        suffix = "make sure you charger is connected via USB and driver is working"
         if isinstance(e, DeviceNotFoundException):
-            return "Charger not found, make sure you charger is connected via USB"
+            return "Charger not found, %s" % suffix
         else:
             logging.exception(e)
-            return "Unexpected error occurred: %s" % e
+            return "Unexpected error occurred: %s, %s" % (e, suffix)
 
     def generate_id(self):
         return str(uuid.uuid4())
