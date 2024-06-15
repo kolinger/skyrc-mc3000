@@ -114,6 +114,12 @@ body {
     cursor: pointer;
 }
 
+.profiles-mode .profile-list .position .number {
+    display: inline-block;
+    margin: 0 5px 0 0;
+    vertical-align: middle;
+}
+
 .profiles-mode .profile-list .position a {
     padding: 4px 5px;
 }

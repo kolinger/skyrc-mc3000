@@ -75,6 +75,7 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
+                                        <td></td>
                                         <td>Name</td>
                                         <td>Profile</td>
                                         <td>Action</td>
@@ -84,6 +85,7 @@
                                     {% for profile in profiles %}
                                         <tr data-id="{{ profile.id }}">
                                             <td class="position">
+                                                <span class="number">{{ loop.index }}</span>
                                                 <a href="#" data-move="up" class="btn btn-sm btn-default" title="move up">
                                                     ▲
                                                 </a>
