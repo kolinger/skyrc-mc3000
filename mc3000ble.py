@@ -30,9 +30,9 @@ class MC3000Ble:
 
     types = {0: "LiIon", 1: "LiFe", 2: "LiIo4_35", 3: "NiMH", 4: "NiCd", 5: "NiZn", 6: "Eneloop", 7: "Ram", 8: "Batlto"}
     modes = {
-        0: {0: "charge", 1: "refresh", 2: "storage", 3: "discharge", 4: "cycle"},
-        1: {0: "charge", 1: "refresh", 2: "discharge", 3: "cycle"},
-        2: {0: "charge", 1: "refresh", 2: "break in", 3: "discharge", 4: "cycle"},
+        0: {0: "Charge", 1: "Refresh", 2: "Storage", 3: "Discharge", 4: "Cycle"},
+        1: {0: "Charge", 1: "Refresh", 2: "Discharge", 3: "Cycle"},
+        2: {0: "Charge", 1: "Refresh", 2: "Break in", 3: "Discharge", 4: "Cycle"},
     }
     modes_types_mapping = {
         # mode_index: [type_index, type_index, ...]
@@ -41,24 +41,24 @@ class MC3000Ble:
         2: [3, 4, 6],
     }
     statuses = {
-        0: "standby",
-        1: "charge",
-        2: "discharge",
-        3: "pause",
-        4: "completed",
-        128: "input low voltage",
-        129: "input high voltage",
+        0: "Standby",
+        1: "Charge",
+        2: "Discharge",
+        3: "Pause",
+        4: "Completed",
+        128: "Input low voltage",
+        129: "Input high voltage",
         130: "ADC MCP3424-1 error",
         131: "ADC MCP3424-2 error",
-        132: "connection brake",
-        133: "check voltage",
-        134: "capacity limit reached",
-        135: "time limit reached",
-        136: "system over temperature",
-        137: "battery over temperature",
-        138: "short circuit",
-        139: "wrong polarity",
-        140: "Battery so poor",
+        132: "Connection brake",
+        133: "Check voltage",
+        134: "Capacity limit reached",
+        135: "Time limit reached",
+        136: "SysTemp too hot",
+        137: "Battery too hot",
+        138: "Short circuit",
+        139: "Wrong polarity",
+        140: "Bad battery (high IR)",
     }
 
     def __init__(self, ble_address, interval=1):

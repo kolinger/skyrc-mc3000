@@ -242,7 +242,7 @@ class Server:
         if slot_index not in self.previous:
             self.previous[slot_index] = None
 
-        if battery_info["status"] not in ["standby", "charge", "discharge"]:
+        if battery_info["status"].lower() not in ["standby", "charge", "discharge"]:
             if self.previous[slot_index] != battery_info["status"]:
                 self.notify.message = "Slot %s changed status to '%s'" % (slot_index + 1, battery_info["status"])
                 self.notify.send()
