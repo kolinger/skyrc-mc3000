@@ -58,6 +58,7 @@ class MC3000Ble:
         137: "battery over temperature",
         138: "short circuit",
         139: "wrong polarity",
+        140: "Battery so poor",
     }
 
     def __init__(self, ble_address, interval=1):
