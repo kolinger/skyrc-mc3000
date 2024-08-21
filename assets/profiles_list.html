@@ -148,7 +148,7 @@
                             {% for item in profile.get_display_fields() %}
                                 <tr>
                                     <th title="{{ item["name"] }}">{{ item["alias"] }}</th>
-                                    <td>{{ item["value"] }}</td>
+                                    <td title="{{ item["raw_value"] }}">{{ item["value"] }}</td>
                                 </tr>
                             {% endfor %}
                         </table>

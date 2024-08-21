@@ -232,6 +232,8 @@ class SlotSettings:
             if name in ["slot_number", "busy_tag", "id", "name"]:
                 continue
 
+            raw_value = value
+
             if name == "battery_type":
                 value = self.get_battery_type_label()
             elif name == "operation_mode":
@@ -259,6 +261,7 @@ class SlotSettings:
                 "name": name,
                 "alias": alias,
                 "value": value,
+                "raw_value": raw_value,
             }
             fields.append(item)
 
