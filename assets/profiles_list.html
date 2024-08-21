@@ -144,12 +144,11 @@
                         <h4 class="modal-title" id="myModalLabel">Profile '{{ profile.get_description(True) }}'</h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info">TODO: format into readable form</div>
                         <table class="table table-hover">
-                            {% for name, value in profile.get_display_fields() %}
+                            {% for item in profile.get_display_fields() %}
                                 <tr>
-                                    <th>{{ name }}</th>
-                                    <td>{{ value }}</td>
+                                    <th title="{{ item["name"] }}">{{ item["alias"] }}</th>
+                                    <td>{{ item["value"] }}</td>
                                 </tr>
                             {% endfor %}
                         </table>

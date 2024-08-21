@@ -36,7 +36,6 @@ class MC3000Usb:
             except USBError:
                 self.device.set_configuration()
 
-
     def write(self, data):
         self.open()
 
@@ -61,6 +60,27 @@ class Definitions:
     OPERATION_MODES_LI = ["Charge", "Refresh", "Storage", "Discharge", "Cycle"]
     OPERATION_MODES_NI = ["Charge", "Refresh", "Break_in", "Discharge", "Cycle"]
     OPERATION_MODES_ZN_RAM = ["Charge", "Refresh", "Discharge", "Cycle"]
+    CAPACITIES = [
+        0, 600, 720, 800, 960, 900, 1080, 1000, 1200, 2000, 2400, 2200, 2640, 2500, 3000, 3200, 3840, 6000, 7200
+    ]
+    CYCLE_MODES = ["C > D", "C > D > C", "D > C", "D > C > D"]
+    TRICKLE_TIMES = ["OFF", "End", "Rest"]
+    FIELD_ALIASES = {
+        "number_cycle": "Cycle count",
+    }
+    FIELD_UNITS = {
+        "charge_current": "mA",
+        "discharge_current": "mA",
+        "discharge_cut_voltage": "mV",
+        "charge_end_voltage": "mV",
+        "charge_end_current": "mA",
+        "discharge_reduce_current": "mA",
+        "charge_resting_time": "min",
+        "peak_sense_voltage": "mV",
+        "trickle_current": "mA",
+        "restart_voltage": "mV",
+        "discharge_resting_time": "min",
+    }
 
 
 DONT_VALIDATE_FIELDS = ["id", "name"]
@@ -132,6 +152,34 @@ class SlotSettings:
             return modes[self.operation_mode]
         return "Mode%s" % self.operation_mode
 
+    def get_capacity_label(self):
+        if self.capacity == 0:
+            return "OFF"
+        elif self.capacity in Definitions.CAPACITIES:
+            return Definitions.CAPACITIES[self.capacity]
+        return "Capacity%s" % self.capacity
+
+    def get_cycle_mode_label(self):
+        if self.cycle_mode == 0:
+            return "OFF"
+        elif self.cycle_mode in Definitions.CYCLE_MODES:
+            return Definitions.CYCLE_MODES[self.cycle_mode]
+        return "CycleMode%s" % self.cycle_mode
+
+    def get_temperature_unit_label(self):
+        if self.temperature_unit == 0:
+            return "°C"
+        elif self.temperature_unit == 1:
+            return "°F"
+        return "TemperatureUnit%s" % self.temperature_unit
+
+    def get_trickle_time_label(self):
+        if self.trickle_time == 0:
+            return "OFF"
+        elif self.trickle_time in Definitions.TRICKLE_TIMES:
+            return Definitions.TRICKLE_TIMES[self.trickle_time]
+        return "TrickleTime%s" % self.trickle_time
+
     def get_fields(self):
         dict = self.__dict__.copy()
         del dict["raw"]
@@ -183,7 +231,37 @@ class SlotSettings:
         for name, value in self.get_fields().items():
             if name in ["slot_number", "busy_tag", "id", "name"]:
                 continue
-            fields.append((name, value))
+
+            if name == "battery_type":
+                value = self.get_battery_type_label()
+            elif name == "operation_mode":
+                value = self.get_operation_mode_label()
+            elif name == "capacity":
+                value = self.get_capacity_label()
+            elif name == "cycle_mode":
+                value = self.get_cycle_mode_label()
+            elif name == "temperature_unit":
+                value = self.get_temperature_unit_label()
+            elif name == "trickle_time":
+                value = self.get_trickle_time_label()
+
+            if name in Definitions.FIELD_ALIASES:
+                alias = Definitions.FIELD_ALIASES[name]
+            else:
+                alias = name.replace("_", " ").capitalize()
+
+            if name in Definitions.FIELD_UNITS:
+                value = "%s %s" % (value, Definitions.FIELD_UNITS[name])
+            elif name.endswith("_temperature"):
+                value = "%s %s" % (value, self.get_temperature_unit_label())
+
+            item = {
+                "name": name,
+                "alias": alias,
+                "value": value,
+            }
+            fields.append(item)
+
         return fields
 
 
