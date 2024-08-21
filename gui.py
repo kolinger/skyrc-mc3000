@@ -255,7 +255,7 @@ class Server:
             if self.last_update_time is not None:
                 if self.last_update_time < time() - 10:
                     if not self.waiting:
-                        self.set_title_waiting()
+                        self.set_title_connecting()
                         self.notify.message = "Lost connection with charger!"
                         self.notify.send()
                     self.waiting = True
@@ -267,10 +267,10 @@ class Server:
     def disable_timeout(self):
         self.last_update_time = None
         self.waiting = True
-        self.set_title_waiting()
+        self.set_title_connecting()
 
-    def set_title_waiting(self):
-        self.set_title("%s - %s" % (self.title, "waiting for connection"))
+    def set_title_connecting(self):
+        self.set_title("%s - %s" % (self.title, "Trying to connect..."))
 
     def run_window(self):
         api = Api(*server.address)
@@ -297,7 +297,7 @@ class Server:
             parameters["height"] = self.config.read("monitor_window_height", 370)
             parameters["x"] = self.config.read("monitor_window_x", None)
             parameters["y"] = self.config.read("monitor_window_y", None)
-            parameters["title"] = "%s - waiting for connection" % server.title
+            parameters["title"] = "%s - Trying to connect..." % server.title
 
         self.clamp_coordinates(parameters)
 
