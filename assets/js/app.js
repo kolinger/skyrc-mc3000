@@ -79,7 +79,7 @@ App.prototype.update = function (data) {
         table.find('[data-led] td:nth-child(' + nth + ') .led').attr('class', 'led ' + payload.led);
         table.find('[data-type] td:nth-child(' + nth + ')').text(payload.type);
         table.find('[data-mode] td:nth-child(' + nth + ')').text(payload.mode);
-        table.find('[data-status] td:nth-child(' + nth + ')').text(payload.status.toLowerCase());
+        table.find('[data-status] td:nth-child(' + nth + ')').text(payload.status);
         table.find('[data-voltage] td:nth-child(' + nth + ')').text(payload.voltage + ' V');
         table.find('[data-current] td:nth-child(' + nth + ')').text(payload.current + ' A');
         table.find('[data-capacity] td:nth-child(' + nth + ')').text(payload.capacity + ' mAh');
