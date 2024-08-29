@@ -38,11 +38,12 @@
                                         <td>Profile</td>
                                         <td>Name</td>
                                         <td>Save</td>
+                                        <td>Action</td>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for profile in found %}
-                                        <tr data-toggle-checkbox>
+                                        <tr data-id="{{ profile.id }}" data-toggle-checkbox>
                                             {% if not imported %}
                                                 <td>{{ profile.get_slot() }}</td>
                                             {% endif %}
@@ -52,6 +53,11 @@
                                             </td>
                                             <td>
                                                 <input type="checkbox" name="save-id-{{ profile.id }}" />
+                                            </td>
+                                            <td>
+                                                <a href="#" data-show-details class="btn btn-sm btn-default">
+                                                    Details
+                                                </a>
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -135,13 +141,21 @@
         </div>
     </div>
 
-    {% for profile in profiles %}
+    {% macro render_profile_detail_modal(profile, source=None) %}
         <div class="modal fade" tabindex="-1" data-id="{{ profile.id }}">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal">&times;</button>
-                        <h4 class="modal-title" id="myModalLabel">Profile '{{ profile.get_description(True) }}'</h4>
+                        <h4 class="modal-title">
+                            {% if source == "json" %}
+                                Imported profile '{{ profile.get_description(True) }}'
+                            {% elif source == "usb" %}
+                                Slot {{ profile.get_slot() }}
+                            {% else %}
+                                Profile '{{ profile.get_description(True) }}'
+                            {% endif %}
+                        </h4>
                     </div>
                     <div class="modal-body">
                         <table class="table table-hover">
@@ -159,5 +173,14 @@
                 </div>
             </div>
         </div>
+    {% endmacro %}
+
+    {% for profile in profiles %}
+        {{ render_profile_detail_modal(profile) }}
     {% endfor %}
+    {% if found %}
+        {% for profile in found %}
+            {{ render_profile_detail_modal(profile, source="json" if imported else "usb") }}
+        {% endfor %}
+    {% endif %}
 {% endblock %}
