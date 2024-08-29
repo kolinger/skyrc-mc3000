@@ -5,7 +5,7 @@ import sys
 import usb.core
 from usb.core import USBError
 
-from shared import calculate_checksum
+from shared import calculate_checksum, compare_checksum
 
 
 # protocol source
@@ -44,10 +44,10 @@ class MC3000Usb:
 
         self.device.write(self.ENDPOINT_OUT, bytes(data))
 
-    def read(self):
+    def read(self, checksum=None):
         self.open()
         data = self.device.read(self.ENDPOINT_IN, self.MESSAGE_SIZE)
-        if calculate_checksum(data[:-1]) != data[-1]:
+        if compare_checksum(data, checksum):
             raise ChecksumException(data)
         return data
 
@@ -350,6 +350,14 @@ class MC3000Encoder:
         data[33] = calculate_checksum(data[2:])
         data[34] = 0xFF
         data[35] = 0xFF
+        return data
+
+    def prepare_system_settings_read(self):
+        data = [0x0f, 0x04, 0x5a, 0x00]  # header
+        data.extend([0x00] * 4)
+        data[5] = calculate_checksum(data[2:])
+        data[6] = 0xFF
+        data[7] = 0xFF
         return data
 
     def decode_int(self, data, index):
