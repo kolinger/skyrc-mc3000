@@ -50,7 +50,7 @@ class MC3000Ble:
         129: "Input high voltage",
         130: "ADC MCP3424-1 error",
         131: "ADC MCP3424-2 error",
-        132: "Connection brake",
+        132: "Connection break",
         133: "Check voltage",
         134: "Capacity limit reached",
         135: "Time limit reached",
