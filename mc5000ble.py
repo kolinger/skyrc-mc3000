@@ -181,9 +181,9 @@ class MC5000Ble:
         # A fake LED emulation in the style of MC3000, since MC5000 has pulsing green for charging and solid
         # green for charged - that's not very friendly, so we make red for charging and green for charged.
         led_color = "none"
-        if battery_info["status"] == "Charging":
+        if status >= 1 and status <= 4:
             led_color = "red"
-        elif battery_info["status"] == "Completed":
+        elif status >= 5:
             led_color = "green"
         battery_info["led"] = led_color
 
