@@ -16,10 +16,10 @@ class MC3000Ble:
     This code implements only reading status of slots.
     All decoding logic was extracted from Android SkyRC MC3000 apk.
 
-    Specifically `com.skyrc.mc3000.thread.BleThread` together with `com.skyrc.mc3000.broadcast.actions.Config`
+    Specifically, `com.skyrc.mc3000.thread.BleThread` together with `com.skyrc.mc3000.broadcast.actions.Config`
     contain also other functions like get/set parameters, start/stop control, ... I didn't implement those
     since I'm interested only in slots readout to monitor progress. Android code is quite readable,
-    nearly all logic is contained in classes.dex and jadx-gui does good job on decompiling.
+    nearly all logic is contained in classes.dex, and jadx-gui does a good job on decompiling.
     """
 
     SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb"
@@ -42,8 +42,8 @@ class MC3000Ble:
     }
     statuses = {
         0: "Standby",
-        1: "Charge",
-        2: "Discharge",
+        1: "Charging",
+        2: "Discharging",
         3: "Pause",
         4: "Completed",
         128: "Input low voltage",
@@ -107,6 +107,7 @@ class MC3000Ble:
             battery_info = self.parse_battery_info(data)
             if self.receive_callback:
                 callback = self.receive_callback
+                # noinspection PyCallingNonCallable
                 callback(battery_info)
 
     def raw_receive_callback(self, data):
@@ -117,17 +118,17 @@ class MC3000Ble:
             "slot": data[2],
         }
 
-        type = data[3] & 255
-        battery_info["type"] = self.types[type] if type in self.types else "unknown"
+        battery_type = data[3] & 255
+        battery_info["type"] = self.types.get(battery_type, "unknown")
 
-        available_modes = None
+        available_modes = []
         for mode_group, applicable_types in self.modes_types_mapping.items():
-            if type in applicable_types:
+            if battery_type in applicable_types:
                 available_modes = self.modes[mode_group]
                 break
 
         mode = data[4] & 255
-        battery_info["mode"] = available_modes[mode] if mode in available_modes else "unknown"
+        battery_info["mode"] = available_modes.get(mode, "unknown")
         battery_info["count"] = data[5] & 255
 
         status = data[6] & 255
@@ -146,6 +147,7 @@ class MC3000Ble:
 
         led = data[18] & 255
         battery_info["led"] = self.resolve_led_color(led, battery_info["slot"])
+
         return battery_info
 
     def resolve_led_color(self, value, slot_index):

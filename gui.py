@@ -19,6 +19,7 @@ import webview
 import config
 from config import project_dir
 from mc3000ble import MC3000Ble
+from mc5000ble import MC5000Ble
 from profiles import ProfilesController
 
 
@@ -36,10 +37,14 @@ class Server:
     variables = {}
     window = None
 
-    def __init__(self, title, profiles_mode=False):
-        self.title = title
+    def __init__(self, app_name, profiles_mode=False, mc5000_mode=False):
+        self.app_name = app_name
+        self.title = app_name
         self.profiles_mode = profiles_mode
-        self.config = config.Config()
+        self.mc5000_mode = mc5000_mode
+
+        config_name = "config-mc5000.json" if mc5000_mode else "config.json"
+        self.config = config.Config(config_name)
 
         gui_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets")
         if not os.path.exists(gui_dir):
@@ -67,8 +72,8 @@ class Server:
             app.add_url_rule("/scan/select", "scan_select", self.scan_select)
 
         self.notify = Notify(
-            default_notification_title="SkyRC MC3000 status update",
-            default_notification_application_name="SkyRC MC3000 BLE",
+            default_notification_title="%s status update" % app_name,
+            default_notification_application_name="%s BLE" % app_name,
             default_notification_icon=os.path.join(project_dir, "assets", "img", "icon.ico"),
         )
 
@@ -205,7 +210,11 @@ class Server:
             self.timeout_thread.start()
 
     def _background_service(self):
-        self.service = MC3000Ble(ble_address=self.config.read("ble_address"))
+        if self.mc5000_mode:
+            self.service = MC5000Ble(ble_address=self.config.read("ble_address"))
+        else:
+            self.service = MC3000Ble(ble_address=self.config.read("ble_address"))
+
         while True:
             try:
                 self.service.run(self._update)
@@ -242,7 +251,7 @@ class Server:
         if slot_index not in self.previous:
             self.previous[slot_index] = None
 
-        if battery_info["status"].lower() not in ["standby", "charge", "discharge"]:
+        if battery_info["status"].lower() not in ["standby", "charging", "discharging"]:
             if self.previous[slot_index] != battery_info["status"]:
                 self.notify.message = "Slot %s changed status to '%s'" % (slot_index + 1, battery_info["status"])
                 self.notify.send()
@@ -371,24 +380,25 @@ class Api:
 
 
 if __name__ == "__main__":
-    config.setup_logging("MC3000")
+    argument = sys.argv[1] if len(sys.argv) > 1 else None
+    profiles_mode = argument == "profiles"
+    mc5000_mode = argument == "mc5000"
+    app_name = "MC5000" if mc5000_mode else "MC3000"
+
+    config.setup_logging(app_name)
 
     try:
         logging.info("starting")
 
-        argument = sys.argv[1] if len(sys.argv) > 1 else None
-        profiles_mode = argument == "profiles"
-
-        server = Server("MC3000", profiles_mode=profiles_mode)
+        server = Server(app_name, profiles_mode=profiles_mode, mc5000_mode=mc5000_mode)
         SafeThread(target=server.run, daemon=True).start()
 
         while not isinstance(server.address, tuple):
             sleep(0.010)
 
         server.run_window()
-    except SystemExit:
-        raise
     except KeyboardInterrupt:
         exit(1)
-    except:
-        logging.exception(sys.exc_info()[0])
+    except Exception as e:
+        logging.exception(e)
+        exit(1)

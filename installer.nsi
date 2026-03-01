@@ -1,14 +1,11 @@
 !include MUI2.nsh
 
-Name "SkyRC MC3000 BLE"
+Name "MC3000 / MC5000 Monitor and MC3000 USB Profiles"
+
 
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-!define MUI_FINISHPAGE_RUN
-!define MUI_FINISHPAGE_RUN_NOTCHECKED
-!define MUI_FINISHPAGE_RUN_TEXT "Start application"
-!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchLink"
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
@@ -26,9 +23,11 @@ Section "Dummy Section" SecDummy
     File /r dist\mc3000ble\*.*
 
     ; shortcuts
+    RMDir /r "$SMPROGRAMS\MC3000 BLE"
     CreateDirectory "$SMPROGRAMS\MC3000 BLE"
     CreateShortcut "$SMPROGRAMS\MC3000 BLE\Uninstall.lnk" "$INSTDIR\uninstall.exe"
-    CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC3000 BLE.lnk" "$INSTDIR\mc3000ble.exe"
+    CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC3000 BLE Monitor.lnk" "$INSTDIR\mc3000ble.exe"
+    CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC5000 BLE Monitor.lnk" "$INSTDIR\mc3000ble.exe" "mc5000"
     CreateShortcut "$SMPROGRAMS\MC3000 BLE\MC3000 USB Profiles.lnk" "$INSTDIR\mc3000ble.exe" "profiles"
 
     ; reinstall helper
@@ -57,10 +56,6 @@ Section "Uninstall"
     DeleteRegKey HKLM "Software\mc3000ble"
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\mc3000ble"
 SectionEnd
-
-Function LaunchLink
-  ExecShell "" "$SMPROGRAMS\MC3000 BLE\MC3000 BLE.lnk"
-FunctionEnd
 
 # Install edge webview2 by launching the bootstrapper
 # See https://docs.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution#online-only-deployment
