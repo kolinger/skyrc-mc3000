@@ -48,9 +48,9 @@ class MC5000Ble:
 
     modes_types_mapping = {
         # mode_index: [type_index, type_index, ...]
-        0: [0, 1, 2, 8, 9],  # The "lithium" mode = Li-ion, Li-ion HV, LiFePO4, Na-ion
+        0: [0, 1, 2, 8, 9],  # The "lithium" mode = Li-ion, Li-ion HV, LiFePO4, LTO, Na-ion
         1: [3, 4, 5],  # The "NiMH" mode = NiMH, NiCd, Eneloop
-        2: [6, 7],  # The "NiZn" mode = RAM, LTO
+        2: [6, 7],  # The "NiZn" mode = NiZn, RAM
     }
 
     statuses = {
