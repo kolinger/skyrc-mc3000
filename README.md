@@ -37,8 +37,9 @@ TX/RX frames, can pause or clear the display, exports frames to
 The UI uses a consistent dark palette regardless of the desktop's theme.
 
 Each slot card shows status, battery type and mode, followed by a compact grid
-of voltage, current, capacity, elapsed time, temperature and resistance. Below
-the cards, a history chart graphs voltage, current, temperature or capacity
+of voltage, current, capacity, elapsed time and resistance. Temperature is
+omitted because the MC5000's temperature field is for a bound thermologger.
+Below the cards, a history chart graphs voltage, current or capacity
 (chosen with the metric buttons) for all four slots. Samples are recorded once a
 second while a slot is active, and up to 6 hours are kept. The buttons under
 the chart pick the time window (All, or the last 1 min to 3 h). The y axis fits the visible
@@ -56,7 +57,7 @@ shows the smoothed value. Click a slot in the legend, or the coloured bar on its
 slot card, to hide or show its line (the bar is outlined while hidden).
 **Export** saves everything captured so far as a CSV file, using the desktop's
 save dialog (starting in Documents). Each row is one slot reading:
-`timestamp,elapsed_s,slot,voltage_v,current_a,temperature_c,capacity_mah`,
+`timestamp,elapsed_s,slot,voltage_v,current_a,capacity_mah`,
 with local ISO 8601 timestamps. All slots and the full history are included, as
 measured: chart smoothing, hidden lines and the time window don't affect it.
 **Clear** discards the history.

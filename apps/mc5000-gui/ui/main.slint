@@ -17,7 +17,6 @@ export struct SlotInfo {
     current: string,
     capacity: string,
     time: string,
-    temperature: string,
     resistance: string,
     led: string,
 }
@@ -149,7 +148,6 @@ component SlotCard inherits Rectangle {
                 Metric { label: "Time"; value: info.time; }
             }
             Row {
-                Metric { label: "Temperature"; value: info.temperature; }
                 Metric { label: "Resistance"; value: info.resistance; }
             }
         }
@@ -208,7 +206,7 @@ component MetricPills inherits HorizontalLayout {
     in-out property <int> metric;
     callback metric-selected(int);
     spacing: 6px;
-    for name[index] in ["Voltage", "Current", "Temperature", "Capacity"]: Pill {
+    for name[index] in ["Voltage", "Current", "Capacity"]: Pill {
         text: name;
         active: index == root.metric;
         clicked => {

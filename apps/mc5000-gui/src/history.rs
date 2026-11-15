@@ -18,17 +18,11 @@ const MIN_SPAN_SECONDS: f64 = 60.0;
 pub(crate) enum Metric {
     Voltage,
     Current,
-    Temperature,
     Capacity,
 }
 
 impl Metric {
-    pub(crate) const ALL: [Self; 4] = [
-        Self::Voltage,
-        Self::Current,
-        Self::Temperature,
-        Self::Capacity,
-    ];
+    pub(crate) const ALL: [Self; 3] = [Self::Voltage, Self::Current, Self::Capacity];
 
     pub(crate) fn from_index(index: i32) -> Self {
         usize::try_from(index)
@@ -45,17 +39,15 @@ impl Metric {
     const fn min_span(self) -> f64 {
         match self {
             Self::Voltage | Self::Current => 0.1,
-            Self::Temperature => 2.0,
             Self::Capacity => 10.0,
         }
     }
 
-    /// Formats a reading at the charger's full resolution (mV, mA, 0.1 °C, mAh).
+    /// Formats a reading at the charger's full resolution (mV, mA, mAh).
     fn format_precise(self, value: f64) -> String {
         match self {
             Self::Voltage => format!("{value:.3} V"),
             Self::Current => format!("{value:.3} A"),
-            Self::Temperature => format!("{value:.1} °C"),
             Self::Capacity => format!("{value:.0} mAh"),
         }
     }
@@ -65,7 +57,6 @@ impl Metric {
         let (base, unit) = match self {
             Self::Voltage => (2, "V"),
             Self::Current => (2, "A"),
-            Self::Temperature => (1, "°C"),
             Self::Capacity => (0, "mAh"),
         };
         // Enough decimals to tell the three labels (span / 2 apart) apart, capped at 4.
@@ -79,7 +70,7 @@ impl Metric {
 #[derive(Clone, Copy, Debug)]
 struct Sample {
     seconds: f64,
-    values: [f64; 4],
+    values: [f64; 3],
 }
 
 /// Selectable time axis lengths, ending at "now". `None` shows all history.
@@ -227,7 +218,6 @@ impl History {
             values: [
                 status.voltage_volts(),
                 status.current_amps(),
-                status.temperature_celsius(),
                 f64::from(status.capacity_mah),
             ],
         });
@@ -249,9 +239,7 @@ impl History {
         let first = rows.first()?.1.seconds;
         let end = now.saturating_duration_since(self.origin).as_secs_f64();
 
-        let mut csv = String::from(
-            "timestamp,elapsed_s,slot,voltage_v,current_a,temperature_c,capacity_mah\n",
-        );
+        let mut csv = String::from("timestamp,elapsed_s,slot,voltage_v,current_a,capacity_mah\n");
         for (slot, sample) in rows {
             let ago = chrono::Duration::milliseconds(
                 // Within the six hours kept, so this always fits.
@@ -260,11 +248,11 @@ impl History {
                     ((end - sample.seconds).max(0.0) * 1000.0).round() as i64
                 },
             );
-            let [voltage, current, temperature, capacity] = sample.values;
+            let [voltage, current, capacity] = sample.values;
             // Writing to a String cannot fail.
             let _ = writeln!(
                 csv,
-                "{},{:.1},{},{voltage:.3},{current:.3},{temperature:.1},{capacity:.0}",
+                "{},{:.1},{},{voltage:.3},{current:.3},{capacity:.0}",
                 (wall_now - ago).format("%Y-%m-%dT%H:%M:%S%:z"),
                 sample.seconds - first,
                 slot + 1,
@@ -1222,7 +1210,7 @@ mod tests {
         let lines = csv.lines().collect::<Vec<_>>();
         assert_eq!(
             lines[0],
-            "timestamp,elapsed_s,slot,voltage_v,current_a,temperature_c,capacity_mah"
+            "timestamp,elapsed_s,slot,voltage_v,current_a,capacity_mah"
         );
         let fields = |line: &str| line.split(',').map(str::to_owned).collect::<Vec<_>>();
         let rows = lines[1..]
@@ -1230,9 +1218,9 @@ mod tests {
             .map(|line| fields(line))
             .collect::<Vec<_>>();
         assert_eq!(rows.len(), 3);
-        assert_eq!(rows[0][1..], ["0.0", "1", "3.650", "1.000", "25.0", "7"]);
-        assert_eq!(rows[1][1..], ["0.0", "3", "4.100", "1.000", "25.0", "12"]);
-        assert_eq!(rows[2][1..], ["1.0", "1", "3.700", "1.000", "25.0", "8"]);
+        assert_eq!(rows[0][1..], ["0.0", "1", "3.650", "1.000", "7"]);
+        assert_eq!(rows[1][1..], ["0.0", "3", "4.100", "1.000", "12"]);
+        assert_eq!(rows[2][1..], ["1.0", "1", "3.700", "1.000", "8"]);
 
         let stamp = |row: &[String]| DateTime::parse_from_rfc3339(&row[0]).unwrap();
         assert_eq!(

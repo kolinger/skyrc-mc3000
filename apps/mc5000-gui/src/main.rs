@@ -854,7 +854,6 @@ fn empty_slot_info(slot: Slot) -> SlotInfo {
         current: "— A".into(),
         capacity: "— mAh".into(),
         time: "—".into(),
-        temperature: "— °C".into(),
         resistance: "— mΩ".into(),
         led: "none".into(),
     }
@@ -877,7 +876,6 @@ fn slot_info(slot: Slot, status: &SlotStatus) -> SlotInfo {
         current: format!("{:.3} A", status.current_amps()).into(),
         capacity: format!("{} mAh", status.capacity_mah).into(),
         time: format_duration(status.elapsed_seconds).into(),
-        temperature: format!("{:.1} °C", status.temperature_celsius()).into(),
         resistance: format!("{resistance} mΩ").into(),
         led: led_label(status.led_color()).into(),
     }
