@@ -54,6 +54,9 @@ The legacy Python implementation read these big-endian fields:
 The decoder requires at least 19 payload bytes (including offset 3) and ignores
 additional bytes for forward compatibility. Slot correlation remains the
 request slot until captures establish the meaning of the leading response byte.
+Because replies are matched only by command byte, the transport discards any
+notifications still queued before writing a request; otherwise a reply that
+arrives after its request timed out would be attributed to the next slot.
 
 ## Transport behavior
 

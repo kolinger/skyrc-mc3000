@@ -416,6 +416,12 @@ impl Transport for BleTransport {
             })
         })?;
 
+        discard_stale_notifications(
+            self.notifications
+                .as_mut()
+                .ok_or(TransportError::NotificationStreamEnded)?,
+        );
+
         self.publish_frame(FrameDirection::Tx, bytes.clone());
         peripheral
             .write(characteristic, &bytes, write_type)
@@ -426,27 +432,7 @@ impl Transport for BleTransport {
             .notifications
             .as_mut()
             .ok_or(TransportError::NotificationStreamEnded)?;
-        let receive_response = async {
-            loop {
-                let bytes = notifications
-                    .recv()
-                    .await
-                    .ok_or(TransportError::NotificationStreamEnded)?;
-                let response_frame = Frame::parse(&bytes)?;
-                if response_frame.command != expected_command {
-                    warn!(
-                        request = expected_command,
-                        response = response_frame.command,
-                        "ignoring unrelated MC5000 notification"
-                    );
-                    continue;
-                }
-                return decode_response(&bytes).map_err(TransportError::from);
-            }
-        };
-        tokio::time::timeout(self.request_timeout, receive_response)
-            .await
-            .map_err(|_| TransportError::RequestTimeout)?
+        receive_response(notifications, expected_command, self.request_timeout).await
     }
 
     fn raw_frames(&self) -> broadcast::Receiver<RawFrame> {
@@ -454,10 +440,114 @@ impl Transport for BleTransport {
     }
 }
 
+/// Drops notifications queued before a request is written. Slot-status
+/// replies carry no confirmed slot identifier, so a reply that arrives after
+/// its request timed out would otherwise be taken as the answer to the next
+/// request, shifting every later reading onto the wrong slot.
+fn discard_stale_notifications(notifications: &mut mpsc::Receiver<Vec<u8>>) {
+    let mut discarded = 0_usize;
+    while notifications.try_recv().is_ok() {
+        discarded += 1;
+    }
+    if discarded > 0 {
+        warn!(
+            discarded,
+            "discarded late MC5000 notifications before request"
+        );
+    }
+}
+
+async fn receive_response(
+    notifications: &mut mpsc::Receiver<Vec<u8>>,
+    expected_command: u8,
+    timeout: Duration,
+) -> Result<Response, TransportError> {
+    let receive = async {
+        loop {
+            let bytes = notifications
+                .recv()
+                .await
+                .ok_or(TransportError::NotificationStreamEnded)?;
+            let response_frame = Frame::parse(&bytes)?;
+            if response_frame.command != expected_command {
+                warn!(
+                    request = expected_command,
+                    response = response_frame.command,
+                    "ignoring unrelated MC5000 notification"
+                );
+                continue;
+            }
+            return decode_response(&bytes).map_err(TransportError::from);
+        }
+    };
+    tokio::time::timeout(timeout, receive)
+        .await
+        .map_err(|_| TransportError::RequestTimeout)?
+}
+
 impl Drop for BleTransport {
     fn drop(&mut self) {
         if let Some(task) = self.notification_task.take() {
             task.abort();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mc5000_protocol::{Slot, SlotStatus};
+
+    use super::*;
+
+    fn status_reply(voltage_mv: u16) -> Vec<u8> {
+        let mut payload = vec![0; 19];
+        payload[3..5].copy_from_slice(&voltage_mv.to_be_bytes());
+        payload[15] = 2;
+        Frame::new(0x91, &payload).unwrap().encode().unwrap()
+    }
+
+    fn voltage(response: Result<Response, TransportError>) -> u16 {
+        match response.unwrap() {
+            Response::SlotStatus(SlotStatus { voltage_mv, .. }) => voltage_mv,
+            other @ Response::Unknown { .. } => panic!("expected slot status, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn late_reply_is_not_taken_as_the_next_slots_answer() {
+        let (tx, mut rx) = mpsc::channel(NOTIFICATION_BUFFER);
+        let timeout = Duration::from_millis(20);
+        let expected = Command::SlotStatus { slot: Slot::Two }.encode().unwrap()[2];
+
+        // Slot 2's poll times out, then its reply arrives late.
+        let missed = receive_response(&mut rx, expected, timeout).await;
+        assert!(matches!(missed, Err(TransportError::RequestTimeout)));
+        tx.send(status_reply(4_047)).await.unwrap();
+
+        // Slot 3 is polled next and must only see its own reply.
+        discard_stale_notifications(&mut rx);
+        tx.send(status_reply(0)).await.unwrap();
+        assert_eq!(
+            voltage(receive_response(&mut rx, expected, timeout).await),
+            0
+        );
+
+        discard_stale_notifications(&mut rx);
+        tx.send(status_reply(4_110)).await.unwrap();
+        assert_eq!(
+            voltage(receive_response(&mut rx, expected, timeout).await),
+            4_110
+        );
+    }
+
+    #[tokio::test]
+    async fn unrelated_notifications_are_skipped() {
+        let (tx, mut rx) = mpsc::channel(NOTIFICATION_BUFFER);
+        tx.send(Frame::new(0xA5, &[1]).unwrap().encode().unwrap())
+            .await
+            .unwrap();
+        tx.send(status_reply(3_700)).await.unwrap();
+        let response = receive_response(&mut rx, 0x91, Duration::from_millis(20)).await;
+        assert_eq!(voltage(response), 3_700);
     }
 }
