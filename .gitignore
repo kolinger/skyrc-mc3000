@@ -2,4 +2,5 @@
 /dist/
 /log/
 /*.cmd
+/mc5000-gui-*.AppImage
 /target/

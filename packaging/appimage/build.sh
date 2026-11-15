@@ -4,10 +4,19 @@ set -euo pipefail
 root="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
 cd "$root"
 
-export PATH="$root:$PATH"
+PATH="$root:$PATH"
+if [[ -n "${HOME:-}" ]]; then
+    PATH="$PATH:$HOME/.local/bin:$HOME/.cargo/bin"
+fi
+export PATH
+
 linuxdeploy="${LINUXDEPLOY:-linuxdeploy}"
 if ! command -v "$linuxdeploy" >/dev/null 2>&1; then
-    printf 'linuxdeploy was not found; set LINUXDEPLOY to its executable path\n' >&2
+    if [[ -n "${LINUXDEPLOY:-}" ]]; then
+        printf 'LINUXDEPLOY="%s" was not found or is not executable; correct or unset LINUXDEPLOY to use the default\n' "$linuxdeploy" >&2
+    else
+        printf 'linuxdeploy was not found; install it or set LINUXDEPLOY to its executable path\n' >&2
+    fi
     exit 1
 fi
 

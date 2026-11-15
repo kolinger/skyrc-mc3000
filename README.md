@@ -141,11 +141,40 @@ The launch menu also offers **Debug CLI** (prompts for arguments) and
 configurations for debugging the protocol and core tests. Rust must be
 installed through rustup or otherwise available on VS Code's `PATH`.
 
-To package the GUI as an AppImage, install `linuxdeploy` and its AppImage output
-plugin, then run:
+### Package an AppImage
+
+The packaging script requires `linuxdeploy` and its AppImage output plugin.
+For Linux x86-64, the following installs the same upstream builds used by CI
+into your user-local bin directory:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+curl --fail --location \
+  https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
+  --output "$HOME/.local/bin/linuxdeploy"
+curl --fail --location \
+  https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage \
+  --output "$HOME/.local/bin/linuxdeploy-plugin-appimage"
+chmod +x "$HOME/.local/bin/linuxdeploy" "$HOME/.local/bin/linuxdeploy-plugin-appimage"
+```
+
+With the Rust toolchain and both packaging tools available, run:
 
 ```sh
 packaging/appimage/build.sh
+```
+
+The script searches `PATH`, the repository root, and the usual `~/.local/bin`
+and `~/.cargo/bin` locations. The result is `mc5000-gui-x86_64.AppImage` in
+the repository root. If `linuxdeploy` is installed elsewhere, set
+`LINUXDEPLOY` to its executable path; the output plugin must still be available
+in the repository root, on `PATH`, or in `~/.local/bin`.
+
+If an inherited `LINUXDEPLOY` points to the wrong executable, bypass it for one
+build with the following command (also works in fish):
+
+```sh
+env -u LINUXDEPLOY packaging/appimage/build.sh
 ```
 
 ## Project layout
