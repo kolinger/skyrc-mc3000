@@ -1,11 +1,11 @@
-import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+import { Button, CheckBox, ComboBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
 
 export { Palette }
 
 export struct ChargerDevice {
     name: string,
     address: string,
-    rssi: string,
+    detail: string,
 }
 
 export struct SlotInfo {
@@ -27,48 +27,538 @@ export struct FrameInfo {
     detail: string,
 }
 
+export struct ChartData {
+    // Path commands per slot in plot pixel coordinates; empty when nothing to plot.
+    paths: [string],
+    y-max: string,
+    y-mid: string,
+    y-min: string,
+    x-start: string,
+    empty: bool,
+}
+
+// The data point under the cursor on the history chart.
+export struct ChartProbe {
+    visible: bool,
+    // Sample position in plot pixels.
+    x: float,
+    y: float,
+    slot: int,
+    value: string,
+    // Smoothed value the line is drawn at; empty unless smoothing.
+    smoothed: string,
+    time: string,
+}
+
+global Theme {
+    // Per-slot accent, shared by the slot cards and the chart lines.
+    out property <[color]> series: [#60a5fa, #f59e0b, #a78bfa, #f472b6];
+}
+
+component Metric inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 0px;
+    Text { text: root.label; font-size: 11px; color: #9aa3b2; }
+    Text { text: root.value; font-size: 15px; font-weight: 600; color: #e6e9ef; overflow: elide; }
+}
+
 component SlotCard inherits Rectangle {
     in property <SlotInfo> info;
+    in property <color> accent;
+    // Whether this slot's line is shown on the history chart.
+    in property <bool> plotted: true;
+    callback toggle-plot();
     background: #1c1f26;
     border-color: #2e333d;
     border-width: 1px;
     border-radius: 10px;
-    min-width: 220px;
-    min-height: 220px;
+    min-width: 200px;
 
     VerticalLayout {
-        padding: 14px;
-        spacing: 6px;
+        padding: 12px;
+        padding-top: 10px;
+        spacing: 8px;
         HorizontalLayout {
-            Text {
-                text: info.title;
-                font-size: 20px;
-                font-weight: 700;
-                color: #e6e9ef;
+            spacing: 4px;
+            // The accent bar doubles as the chart toggle; the hit area is wider than the bar.
+            Rectangle {
+                width: 10px;
+                Rectangle {
+                    x: 0;
+                    width: plot-touch.has-hover ? 6px : 4px;
+                    border-radius: 2px;
+                    background: root.plotted ? root.accent : transparent;
+                    border-color: root.plotted ? transparent : root.accent.with-alpha(0.6);
+                    border-width: root.plotted ? 0px : 1px;
+                }
+                plot-touch := TouchArea {
+                    x: -6px;
+                    width: parent.width + 6px;
+                    mouse-cursor: pointer;
+                    clicked => { root.toggle-plot(); }
+                }
             }
-            Rectangle { horizontal-stretch: 1; }
+            VerticalLayout {
+                spacing: 0px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: info.title;
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: #e6e9ef;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: info.status;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        color: info.led == "red" ? #ff6b6b : info.led == "green" ? #4ade80 : #c9ced8;
+                    }
+                    Rectangle {
+                        width: 12px;
+                        Rectangle {
+                            width: 12px;
+                            height: 12px;
+                            border-radius: 6px;
+                            background: info.led == "red" ? #e34f4f : info.led == "green" ? #32a76a : #4a505c;
+                        }
+                    }
+                }
+                Text {
+                    text: info.battery-type + "  ·  " + info.mode;
+                    font-size: 12px;
+                    color: #9aa3b2;
+                    overflow: elide;
+                }
+            }
+        }
+        Rectangle { height: 1px; background: #2e333d; }
+        GridLayout {
+            spacing-horizontal: 12px;
+            spacing-vertical: 6px;
+            Row {
+                Metric { label: "Voltage"; value: info.voltage; }
+                Metric { label: "Current"; value: info.current; }
+            }
+            Row {
+                Metric { label: "Capacity"; value: info.capacity; }
+                Metric { label: "Time"; value: info.time; }
+            }
+            Row {
+                Metric { label: "Temperature"; value: info.temperature; }
+                Metric { label: "Resistance"; value: info.resistance; }
+            }
+        }
+    }
+}
+
+component Pill inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+    height: 28px;
+    min-width: max(label.preferred-width + 20px, 32px);
+    border-radius: 6px;
+    background: root.active ? #2b3140 : touch.has-hover ? #22262e : #1c1f26;
+    border-color: root.active ? #4a6fd1 : #2e333d;
+    border-width: 1px;
+    label := Text {
+        text: root.text;
+        font-weight: root.active ? 700 : 400;
+        color: root.active ? #e6e9ef : #9aa3b2;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component LegendItem inherits Rectangle {
+    in property <string> text;
+    in property <color> accent;
+    in property <bool> hidden;
+    callback clicked();
+    min-width: layout.preferred-width;
+    max-width: layout.preferred-width;
+    height: 20px;
+    layout := HorizontalLayout {
+        spacing: 5px;
+        alignment: center;
+        Rectangle {
+            width: 14px;
             Rectangle {
                 width: 14px;
-                height: 14px;
-                border-radius: 7px;
-                background: info.led == "red" ? #e34f4f : info.led == "green" ? #32a76a : #4a505c;
+                height: 3px;
+                border-radius: 1.5px;
+                background: root.hidden ? #4a505c : root.accent;
             }
         }
         Text {
-            text: info.status;
-            font-size: 16px;
-            font-weight: 600;
-            color: info.led == "red" ? #ff6b6b : info.led == "green" ? #4ade80 : #c9ced8;
+            text: root.text;
+            font-size: 12px;
+            vertical-alignment: center;
+            color: root.hidden ? #5c6370 : touch.has-hover ? #e6e9ef : #c9ced8;
         }
-        Text { text: info.battery-type + "  /  " + info.mode; color: #9aa3b2; }
-        Rectangle { height: 1px; background: #2e333d; }
-        HorizontalLayout { Text { text: "Voltage"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.voltage; color: #e6e9ef; } }
-        HorizontalLayout { Text { text: "Current"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.current; color: #e6e9ef; } }
-        HorizontalLayout { Text { text: "Capacity"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.capacity; color: #e6e9ef; } }
-        HorizontalLayout { Text { text: "Time"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.time; color: #e6e9ef; } }
-        HorizontalLayout { Text { text: "Temperature"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.temperature; color: #e6e9ef; } }
-        HorizontalLayout { Text { text: "Resistance"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.resistance; color: #e6e9ef; } }
     }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component MetricPills inherits HorizontalLayout {
+    in-out property <int> metric;
+    callback metric-selected(int);
+    spacing: 6px;
+    for name[index] in ["Voltage", "Current", "Temperature", "Capacity"]: Pill {
+        text: name;
+        active: index == root.metric;
+        clicked => {
+            root.metric = index;
+            root.metric-selected(index);
+        }
+    }
+}
+
+// Smoothing modes, y zoom buttons, Export and Clear.
+component ChartTools inherits HorizontalLayout {
+    in property <bool> zoomed;
+    // 0 = off, 1 = moving average, 2 = fitted spline.
+    in-out property <int> smoothing;
+    callback smoothing-changed();
+    callback zoom(float, float);
+    callback fit();
+    callback export();
+    callback clear();
+    spacing: 6px;
+    alignment: end;
+    // Smoothing modes; clicking the active one turns smoothing off.
+    for name[index] in ["Average", "Spline"]: Pill {
+        text: name;
+        active: root.smoothing == index + 1;
+        clicked => {
+            root.smoothing = self.active ? 0 : index + 1;
+            root.smoothing-changed();
+        }
+    }
+    Rectangle { width: 4px; }
+    Pill { text: "−"; clicked => { root.zoom(1.25, 0.5); } }
+    Pill { text: "+"; clicked => { root.zoom(0.8, 0.5); } }
+    // Highlighted while the y axis follows the data; click to return to it after zooming.
+    Pill { text: "Auto"; active: !root.zoomed; clicked => { root.fit(); } }
+    Rectangle { width: 4px; }
+    Button { text: "Export"; clicked => { root.export(); } }
+    Button { text: "Clear"; clicked => { root.clear(); } }
+}
+
+component HistoryChart inherits Rectangle {
+    in property <ChartData> data;
+    in property <[bool]> hidden;
+    in-out property <int> metric;
+    in property <[string]> windows;
+    in-out property <int> window;
+    in property <bool> zoomed;
+    in-out property <int> smoothing;
+    // Stack the metric pills above the view controls when narrow.
+    in property <bool> compact;
+    callback metric-selected(int);
+    // Time window or smoothing changed; the chart needs redrawing.
+    callback view-changed();
+    // Factor (< 1 zooms in) and anchor as a fraction of the plot height from the top.
+    callback zoom(float, float);
+    // Fraction of the y span to shift; positive when dragging downwards.
+    callback pan(float);
+    // Cursor position over the plot in pixels, and when it leaves.
+    callback hover(float, float);
+    callback leave();
+    in property <ChartProbe> probe;
+    callback fit();
+    callback toggle-series(int);
+    // Save the captured history as CSV.
+    callback export();
+    callback clear();
+    // Plot size in logical pixels; the paths are generated for exactly this size.
+    out property <length> plot-width: plot.width;
+    out property <length> plot-height: plot.height;
+    background: #1c1f26;
+    border-color: #2e333d;
+    border-width: 1px;
+    border-radius: 10px;
+    min-height: 200px;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+        if !root.compact: HorizontalLayout {
+            spacing: 6px;
+            MetricPills {
+                metric <=> root.metric;
+                metric-selected(index) => { root.metric-selected(index); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            ChartTools {
+                zoomed: root.zoomed;
+                smoothing <=> root.smoothing;
+                smoothing-changed => { root.view-changed(); }
+                zoom(factor, anchor) => { root.zoom(factor, anchor); }
+                fit => { root.fit(); }
+                export => { root.export(); }
+                clear => { root.clear(); }
+            }
+        }
+        if root.compact: VerticalLayout {
+            spacing: 6px;
+            HorizontalLayout {
+                MetricPills {
+                    metric <=> root.metric;
+                    metric-selected(index) => { root.metric-selected(index); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            ChartTools {
+                zoomed: root.zoomed;
+                smoothing <=> root.smoothing;
+                smoothing-changed => { root.view-changed(); }
+                zoom(factor, anchor) => { root.zoom(factor, anchor); }
+                fit => { root.fit(); }
+                export => { root.export(); }
+                clear => { root.clear(); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            vertical-stretch: 1;
+            VerticalLayout {
+                width: 64px;
+                Text { text: root.data.y-max; font-size: 11px; color: #9aa3b2; horizontal-alignment: right; }
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.data.y-mid; font-size: 11px; color: #9aa3b2; horizontal-alignment: right; }
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.data.y-min; font-size: 11px; color: #9aa3b2; horizontal-alignment: right; }
+            }
+            plot := Rectangle {
+                background: #15171c;
+                border-radius: 4px;
+                clip: true;
+                for fraction in [0.0, 0.5, 1.0]: Rectangle {
+                    x: 0;
+                    y: (plot.height - 1px) * fraction;
+                    width: plot.width;
+                    height: 1px;
+                    background: #262a33;
+                }
+                for commands[index] in root.data.paths: Path {
+                    x: 0;
+                    y: 0;
+                    width: plot.width;
+                    height: plot.height;
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: plot.width / 1px;
+                    viewbox-height: plot.height / 1px;
+                    commands: commands;
+                    stroke: Theme.series[index];
+                    stroke-width: 2px;
+                }
+                if root.data.empty: Text {
+                    text: "No data yet — graphs fill in while slots are active";
+                    color: #5c6370;
+                }
+                if root.probe.visible: Rectangle {
+                    x: root.probe.x * 1px;
+                    y: 0;
+                    width: 1px;
+                    height: plot.height;
+                    background: #ffffff18;
+                }
+                if root.probe.visible: Rectangle {
+                    x: root.probe.x * 1px - 5px;
+                    y: root.probe.y * 1px - 5px;
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: Theme.series[root.probe.slot];
+                    border-width: 2px;
+                    border-color: #15171c;
+                }
+                // Tooltip beside the point, flipped to stay inside the plot.
+                if root.probe.visible: Rectangle {
+                    property <length> px: root.probe.x * 1px;
+                    property <length> py: root.probe.y * 1px;
+                    x: px + 12px + self.width > plot.width ? px - 12px - self.width : px + 12px;
+                    y: max(4px, min(py - self.height / 2, plot.height - self.height - 4px));
+                    width: tip.preferred-width;
+                    height: tip.preferred-height;
+                    background: #262a33;
+                    border-color: Theme.series[root.probe.slot];
+                    border-width: 1px;
+                    border-radius: 6px;
+                    drop-shadow-blur: 6px;
+                    drop-shadow-color: #00000080;
+                    tip := VerticalLayout {
+                        padding: 6px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 1px;
+                        Text {
+                            text: "Slot " + (root.probe.slot + 1) + "  ·  " + root.probe.time;
+                            font-size: 11px;
+                            color: #9aa3b2;
+                        }
+                        Text {
+                            text: root.probe.value;
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: #e6e9ef;
+                        }
+                        if root.probe.smoothed != "": Text {
+                            text: "smoothed " + root.probe.smoothed;
+                            font-size: 11px;
+                            color: #9aa3b2;
+                        }
+                    }
+                }
+                // Wheel zooms the y axis around the cursor, dragging pans it and
+                // a double click returns to auto-fit.
+                property <length> last-drag-y;
+                drag := TouchArea {
+                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.default;
+                    scroll-event(event) => {
+                        if event.delta-y == 0 {
+                            return reject;
+                        }
+                        root.zoom(event.delta-y > 0 ? 0.8 : 1.25, self.mouse-y / self.height);
+                        accept
+                    }
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down {
+                            last-drag-y = self.mouse-y;
+                        }
+                    }
+                    moved => {
+                        if self.pressed && self.mouse-y != last-drag-y {
+                            root.pan((self.mouse-y - last-drag-y) / self.height);
+                            last-drag-y = self.mouse-y;
+                        }
+                    }
+                    double-clicked => { root.fit(); }
+                    changed mouse-x => { root.hover(self.mouse-x / 1px, self.mouse-y / 1px); }
+                    changed mouse-y => { root.hover(self.mouse-x / 1px, self.mouse-y / 1px); }
+                    changed has-hover => {
+                        if !self.has-hover {
+                            root.leave();
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-left: 70px;
+            spacing: 12px;
+            // Fixed-width axis labels keep the legend from shifting when the chart empties.
+            Text { text: root.data.x-start; width: 80px; font-size: 11px; color: #9aa3b2; }
+            Rectangle { horizontal-stretch: 1; }
+            for index in 4: LegendItem {
+                text: "Slot " + (index + 1);
+                accent: Theme.series[index];
+                hidden: root.hidden[index];
+                clicked => { root.toggle-series(index); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "now"; width: 80px; font-size: 11px; color: #9aa3b2; horizontal-alignment: right; }
+        }
+        // Time window presets; index 0 shows all history.
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: center;
+            for label[index] in root.windows: Pill {
+                text: label;
+                active: index == root.window;
+                clicked => {
+                    root.window = index;
+                    root.view-changed();
+                }
+            }
+        }
+    }
+}
+
+component SlotTab inherits Rectangle {
+    in property <SlotInfo> info;
+    in property <bool> active;
+    callback clicked();
+    height: 34px;
+    border-radius: 6px;
+    background: root.active ? #2b3140 : touch.has-hover ? #22262e : #1c1f26;
+    border-color: root.active ? #4a6fd1 : #2e333d;
+    border-width: 1px;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        alignment: center;
+        Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: info.led == "red" ? #e34f4f : info.led == "green" ? #32a76a : #4a505c;
+        }
+        Text {
+            text: info.title;
+            vertical-alignment: center;
+            font-weight: root.active ? 700 : 400;
+            color: root.active ? #e6e9ef : #9aa3b2;
+        }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Device dropdown (or manual MAC field) with Scan, Connect and the entry-mode toggle.
+component DevicePicker inherits HorizontalLayout {
+    in-out property <bool> manual-entry;
+    in-out property <string> address;
+    in property <[ChargerDevice]> devices;
+    in property <[string]> device-labels;
+    in-out property <int> selected-device;
+    callback scan();
+    callback connect(string);
+    spacing: 8px;
+
+    if !root.manual-entry : ComboBox {
+        horizontal-stretch: 1;
+        min-width: 180px;
+        preferred-width: 360px;
+        enabled: root.device-labels.length > 0;
+        model: root.device-labels.length > 0 ? root.device-labels : ["No chargers found — press Scan"];
+        current-index <=> root.selected-device;
+    }
+    if root.manual-entry : LineEdit {
+        horizontal-stretch: 1;
+        min-width: 180px;
+        preferred-width: 360px;
+        text: root.address;
+        placeholder-text: "Bluetooth address (AA:BB:CC:DD:EE:FF)";
+        edited => { root.address = self.text; }
+        accepted => { root.connect(root.address); }
+    }
+    Button { text: "Scan"; clicked => { root.scan(); } }
+    Button {
+        text: "Connect";
+        primary: true;
+        enabled: root.manual-entry ? root.address != "" : root.devices.length > 0;
+        clicked => {
+            root.connect(root.manual-entry ? root.address : root.devices[root.selected-device].address);
+        }
+    }
+    Button {
+        width: 100px;
+        text: root.manual-entry ? "Device list" : "Enter MAC";
+        clicked => { root.manual-entry = !root.manual-entry; }
+    }
+}
+
+component DebugToggle inherits CheckBox {
+    text: "Debug";
 }
 
 export component MainWindow inherits Window {
@@ -77,8 +567,10 @@ export component MainWindow inherits Window {
 
     in-out property <string> window-title: "MC5000 Monitor";
     title: root.window-title;
-    width: 1120px;
-    height: 760px;
+    preferred-width: 1120px;
+    preferred-height: 760px;
+    min-width: 520px;
+    min-height: 600px;
     background: #121418;
 
     in-out property <string> address: "";
@@ -87,56 +579,158 @@ export component MainWindow inherits Window {
     in-out property <bool> debug-visible: false;
     in-out property <bool> frames-paused: false;
     in property <[ChargerDevice]> devices: [];
+    // Display strings for the device dropdown, parallel to `devices`.
+    in property <[string]> device-labels: [];
+    in-out property <int> selected-device: 0;
+    in-out property <bool> manual-entry: false;
     in property <[SlotInfo]> slots: [];
     in property <[FrameInfo]> frames: [];
+    in property <ChartData> chart: { empty: true };
+    in property <[bool]> chart-hidden: [false, false, false, false];
+    in-out property <int> chart-metric: 0;
+    // Time window labels (index 0 = all history) and the selected one.
+    in property <[string]> chart-windows: [];
+    in-out property <int> chart-window: 0;
+    // True while the y axis is manually zoomed or panned rather than fitted.
+    in property <bool> chart-zoomed: false;
+    // Draw a moving average of each line instead of the raw readings.
+    in-out property <int> chart-smoothing: 0;
+    out property <float> plot-width: chart-view.plot-width / 1px;
+    out property <float> plot-height: chart-view.plot-height / 1px;
+    changed plot-width => { root.chart-changed(); }
+    changed plot-height => { root.chart-changed(); }
+    // Slot shown when the window is too narrow for all four cards side by side.
+    in-out property <int> active-slot: 0;
+    // Below this width the header wraps and the slot cards collapse into tabs.
+    out property <bool> compact: root.width < 960px;
 
     callback scan();
     callback connect(string);
     callback send(string);
     callback clear-frames();
     callback export-frames();
+    callback chart-changed();
+    callback toggle-series(int);
+    callback zoom-chart(float, float);
+    callback pan-chart(float);
+    callback fit-chart();
+    callback hover-chart(float, float);
+    callback leave-chart();
+    in property <ChartProbe> chart-probe;
+    callback export-history();
+    callback clear-history();
 
+    // Explicit geometry keeps this layout's constraints out of the window's own
+    // size hints; otherwise `compact` (from width) would feed back into width.
     VerticalLayout {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
         padding: 16px;
         spacing: 12px;
 
-        HorizontalLayout {
+        if !root.compact : HorizontalLayout {
+            spacing: 8px;
+
             VerticalLayout {
-                spacing: 2px;
-                Text { text: "SkyRC MC5000"; font-size: 24px; font-weight: 700; color: #e6e9ef; }
-                Text { text: root.status-line; color: #9aa3b2; }
+                alignment: center;
+                Text { text: "SkyRC MC5000"; font-size: 20px; font-weight: 700; color: #e6e9ef; }
+                Text { text: root.status-line; color: #9aa3b2; font-size: 12px; }
             }
             Rectangle { horizontal-stretch: 1; }
-            Button { text: "Scan"; clicked => { root.scan(); } }
-            CheckBox {
-                text: "Debug";
-                checked: root.debug-visible;
-                toggled => { root.debug-visible = self.checked; }
+            DevicePicker {
+                horizontal-stretch: 0;
+                manual-entry <=> root.manual-entry;
+                address <=> root.address;
+                devices: root.devices;
+                device-labels: root.device-labels;
+                selected-device <=> root.selected-device;
+                connect(address) => { root.connect(address); }
+                scan => { root.scan(); }
+            }
+            DebugToggle {
+                checked <=> root.debug-visible;
             }
         }
 
-        HorizontalLayout {
-            LineEdit {
-                text: root.address;
-                placeholder-text: "Bluetooth address";
-                edited => { root.address = self.text; }
-            }
-            Button { text: "Connect"; clicked => { root.connect(root.address); } }
-        }
-
-        if root.devices.length > 0 : ScrollView {
-            height: 90px;
-            VerticalLayout {
-                for device in root.devices: Button {
-                    text: device.name + "  (" + device.address + ", " + device.rssi + ")";
-                    clicked => { root.connect(device.address); }
+        if root.compact : VerticalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "SkyRC MC5000"; font-size: 20px; font-weight: 700; color: #e6e9ef; }
+                    Text { text: root.status-line; color: #9aa3b2; font-size: 12px; overflow: elide; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                DebugToggle {
+                    checked <=> root.debug-visible;
                 }
             }
+            DevicePicker {
+                manual-entry <=> root.manual-entry;
+                address <=> root.address;
+                devices: root.devices;
+                device-labels: root.device-labels;
+                selected-device <=> root.selected-device;
+                connect(address) => { root.connect(address); }
+                scan => { root.scan(); }
+            }
         }
 
-        HorizontalLayout {
+        if !root.compact : HorizontalLayout {
             spacing: 12px;
-            for slot in root.slots: SlotCard { info: slot; }
+            vertical-stretch: 0;
+            for slot[index] in root.slots: SlotCard {
+                info: slot;
+                accent: Theme.series[index];
+                plotted: !root.chart-hidden[index];
+                toggle-plot => { root.toggle-series(index); }
+            }
+        }
+
+        if root.compact : VerticalLayout {
+            spacing: 8px;
+            vertical-stretch: 0;
+            HorizontalLayout {
+                spacing: 6px;
+                for slot[index] in root.slots: SlotTab {
+                    info: slot;
+                    active: index == root.active-slot;
+                    clicked => { root.active-slot = index; }
+                }
+            }
+            SlotCard {
+                info: root.slots[root.active-slot];
+                accent: Theme.series[root.active-slot];
+                plotted: !root.chart-hidden[root.active-slot];
+                toggle-plot => { root.toggle-series(root.active-slot); }
+            }
+        }
+
+        chart-view := HistoryChart {
+            vertical-stretch: 1;
+            data: root.chart;
+            hidden: root.chart-hidden;
+            metric <=> root.chart-metric;
+            windows: root.chart-windows;
+            window <=> root.chart-window;
+            zoomed: root.chart-zoomed;
+            smoothing <=> root.chart-smoothing;
+            // The metric and zoom buttons share a row down to about 600 px.
+            compact: root.width < 600px;
+            metric-selected => { root.chart-changed(); }
+            view-changed => { root.chart-changed(); }
+            zoom(factor, anchor) => { root.zoom-chart(factor, anchor); }
+            pan(fraction) => { root.pan-chart(fraction); }
+            fit => { root.fit-chart(); }
+            probe: root.chart-probe;
+            hover(x, y) => { root.hover-chart(x, y); }
+            leave => { root.leave-chart(); }
+            toggle-series(index) => { root.toggle-series(index); }
+            export => { root.export-history(); }
+            clear => { root.clear-history(); }
         }
 
         if root.debug-visible : Rectangle {

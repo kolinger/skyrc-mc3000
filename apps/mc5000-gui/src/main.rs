@@ -1,14 +1,19 @@
 #![allow(missing_debug_implementations, unreachable_pub)]
 
 use std::{
+    cell::{Cell, RefCell},
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, bail};
 use chrono::{DateTime, Local};
-use directories::ProjectDirs;
+use directories::{ProjectDirs, UserDirs};
 use mc5000_ble::{BleTransport, DeviceInfo, FrameDirection, RawFrame, Transport};
 use mc5000_core::{
     ConnectionState, Event, Session, SessionCommand, SessionConfig, raw_session_command,
@@ -27,13 +32,47 @@ use tracing_subscriber::EnvFilter;
 
 slint::include_modules!();
 
+mod history;
 #[cfg(test)]
 mod tests;
+
+use history::{ChartView, History, Metric, Smoothing, TIME_WINDOWS};
+
+/// Chart framing that outlives a single refresh.
+#[derive(Clone, Copy, Debug)]
+struct ChartState {
+    /// Manual y-range while zoomed or panned; `None` fits the data.
+    y_range: Option<(f64, f64)>,
+    /// Range drawn by the last refresh, which zooming and panning start from.
+    shown: (f64, f64),
+    /// Metric of the last refresh; switching units drops the manual range.
+    metric: Metric,
+    /// Cursor position over the plot in plot pixels, while hovering.
+    hover: Option<(f64, f64)>,
+    /// When the chart was last drawn up to. Hovering redraws at the same time,
+    /// so it reuses that plot instead of smoothing everything again.
+    drawn_at: Option<Instant>,
+}
+
+thread_local! {
+    // Lives on the Slint event-loop thread, where all updates are applied.
+    static HISTORY: RefCell<History> = RefCell::new(History::new(Instant::now()));
+    static CHART: Cell<ChartState> = const {
+        Cell::new(ChartState {
+            y_range: None,
+            shown: (0.0, 1.0),
+            metric: Metric::Voltage,
+            hover: None,
+            drawn_at: None,
+        })
+    };
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 struct AppConfig {
     address: String,
+    device_name: String,
     window_width: u32,
     window_height: u32,
 }
@@ -42,6 +81,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             address: String::new(),
+            device_name: String::new(),
             window_width: 1120,
             window_height: 760,
         }
@@ -100,7 +140,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let window_size = ui.window().size();
-    config.address = ui.get_address().to_string();
+    remember_device(&ui, &mut config);
     config.window_width = window_size.width;
     config.window_height = window_size.height;
     save_config(&config_path, &config)?;
@@ -117,9 +157,204 @@ fn create_window(config: &AppConfig) -> anyhow::Result<MainWindow> {
     ui.set_slots(ModelRc::new(VecModel::from(
         Slot::ALL.map(empty_slot_info).to_vec(),
     )));
-    ui.set_devices(ModelRc::new(VecModel::from(Vec::<ChargerDevice>::new())));
+    let remembered = (!config.address.trim().is_empty())
+        .then(|| ChargerDevice {
+            name: if config.device_name.trim().is_empty() {
+                UNKNOWN_CHARGER_NAME.into()
+            } else {
+                config.device_name.clone().into()
+            },
+            address: config.address.clone().into(),
+            detail: "last connected".into(),
+        })
+        .into_iter()
+        .collect();
+    set_device_list(&ui, remembered);
     ui.set_frames(ModelRc::new(VecModel::from(Vec::<FrameInfo>::new())));
+    ui.set_chart_windows(ModelRc::new(VecModel::from(
+        TIME_WINDOWS
+            .iter()
+            .map(|(label, _)| slint::SharedString::from(*label))
+            .collect::<Vec<_>>(),
+    )));
+    bind_chart_callbacks(&ui);
     Ok(ui)
+}
+
+fn bind_chart_callbacks(ui: &MainWindow) {
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_chart_changed(move || {
+            if let Some(ui) = weak_ui.upgrade() {
+                refresh_chart(&ui);
+            }
+        });
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_toggle_series(move |index| {
+            let Some(ui) = weak_ui.upgrade() else {
+                return;
+            };
+            let mut hidden = chart_hidden(&ui);
+            if let Some(flag) = usize::try_from(index)
+                .ok()
+                .and_then(|index| hidden.get_mut(index))
+            {
+                *flag = !*flag;
+            }
+            ui.set_chart_hidden(ModelRc::new(VecModel::from(hidden.to_vec())));
+            refresh_chart(&ui);
+        });
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_zoom_chart(move |factor, anchor| {
+            set_y_range(&weak_ui, |state| {
+                Some(history::zoom_range(
+                    state.shown,
+                    f64::from(factor),
+                    f64::from(anchor),
+                ))
+            });
+        });
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_pan_chart(move |fraction| {
+            set_y_range(&weak_ui, |state| {
+                Some(history::pan_range(state.shown, f64::from(fraction)))
+            });
+        });
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_hover_chart(move |x, y| {
+            set_hover(&weak_ui, Some((f64::from(x), f64::from(y))));
+        });
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_leave_chart(move || set_hover(&weak_ui, None));
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_fit_chart(move || set_y_range(&weak_ui, |_| None));
+    }
+    {
+        let weak_ui = ui.as_weak();
+        let exporting = Arc::new(AtomicBool::new(false));
+        ui.on_export_history(move || export_history(&weak_ui, &exporting));
+    }
+    {
+        let weak_ui = ui.as_weak();
+        ui.on_clear_history(move || {
+            HISTORY.with_borrow_mut(History::clear);
+            CHART.with(|chart| {
+                chart.set(ChartState {
+                    y_range: None,
+                    ..chart.get()
+                });
+            });
+            if let Some(ui) = weak_ui.upgrade() {
+                refresh_chart(&ui);
+            }
+        });
+    }
+}
+
+/// Saves the captured history as CSV. The save dialog runs on its own thread
+/// so the window keeps updating; `exporting` stops a second dialog opening.
+fn export_history(weak_ui: &slint::Weak<MainWindow>, exporting: &Arc<AtomicBool>) {
+    if exporting.load(Ordering::Acquire) {
+        return;
+    }
+    let Some(csv) = HISTORY.with_borrow(|history| history.to_csv(Instant::now(), Local::now()))
+    else {
+        set_status(weak_ui, "No captured data to export yet");
+        return;
+    };
+    exporting.store(true, Ordering::Release);
+    set_status(weak_ui, "Choose where to save the CSV...");
+    let file_name = format!("mc5000-{}.csv", Local::now().format("%Y%m%d-%H%M%S"));
+    let weak_ui = weak_ui.clone();
+    let exporting = Arc::clone(exporting);
+    std::thread::spawn(move || {
+        let status = match save_csv(&file_name, &csv) {
+            Ok(Some(path)) => format!("Exported history to {}", path.display()),
+            Ok(None) => "Export cancelled".to_owned(),
+            Err(error) => format!("History export failed: {error:#}"),
+        };
+        exporting.store(false, Ordering::Release);
+        let _ = slint::invoke_from_event_loop(move || set_status(&weak_ui, &status));
+    });
+}
+
+/// Asks where to save `csv`, starting in the documents folder, and writes it.
+/// `None` when the dialog is cancelled.
+fn save_csv(file_name: &str, csv: &str) -> anyhow::Result<Option<PathBuf>> {
+    let mut dialog = rfd::FileDialog::new()
+        .set_title("Export charge history")
+        .set_file_name(file_name)
+        .add_filter("CSV", &["csv"]);
+    if let Some(documents) =
+        UserDirs::new().and_then(|dirs| dirs.document_dir().map(Path::to_path_buf))
+    {
+        dialog = dialog.set_directory(documents);
+    }
+    let Some(mut path) = dialog.save_file() else {
+        return Ok(None);
+    };
+    if path.extension().is_none() {
+        path.set_extension("csv");
+    }
+    fs::write(&path, csv).with_context(|| format!("could not write {}", path.display()))?;
+    Ok(Some(path))
+}
+
+const UNKNOWN_CHARGER_NAME: &str = "MC5000";
+
+/// Records the current address and, when known, the matching device name so the
+/// next start-up can list the charger by name before any scan.
+fn remember_device(ui: &MainWindow, config: &mut AppConfig) {
+    let address = ui.get_address().to_string();
+    let devices = ui.get_devices();
+    let scanned_name = (0..devices.row_count())
+        .filter_map(|index| devices.row_data(index))
+        .find(|device| device.address.eq_ignore_ascii_case(&address))
+        .map(|device| device.name.to_string())
+        .filter(|name| name != UNKNOWN_CHARGER_NAME);
+    if let Some(name) = scanned_name {
+        config.device_name = name;
+    } else if !address.eq_ignore_ascii_case(&config.address) {
+        config.device_name.clear();
+    }
+    config.address = address;
+}
+
+fn device_label(device: &ChargerDevice) -> slint::SharedString {
+    if device.detail.is_empty() {
+        format!("{}  ·  {}", device.name, device.address).into()
+    } else {
+        format!(
+            "{}  ·  {}  ({})",
+            device.name, device.address, device.detail
+        )
+        .into()
+    }
+}
+
+/// Populates the device dropdown, keeping the current address selected when present.
+fn set_device_list(ui: &MainWindow, devices: Vec<ChargerDevice>) {
+    let address = ui.get_address();
+    let selected = devices
+        .iter()
+        .position(|device| device.address.eq_ignore_ascii_case(&address))
+        .unwrap_or(0);
+    let labels = devices.iter().map(device_label).collect::<Vec<_>>();
+    ui.set_devices(ModelRc::new(VecModel::from(devices)));
+    ui.set_device_labels(ModelRc::new(VecModel::from(labels)));
+    ui.set_selected_device(i32::try_from(selected).unwrap_or(0));
 }
 
 fn bind_callbacks(
@@ -239,19 +474,24 @@ fn apply_update(ui: &MainWindow, update: UiUpdate) {
             let devices = devices
                 .into_iter()
                 .map(|device| ChargerDevice {
-                    name: device.name.unwrap_or_else(|| "MC5000".to_owned()).into(),
+                    name: device
+                        .name
+                        .unwrap_or_else(|| UNKNOWN_CHARGER_NAME.to_owned())
+                        .into(),
                     address: device.address.into(),
-                    rssi: device
+                    detail: device
                         .rssi
-                        .map_or_else(
-                            || "RSSI unavailable".to_owned(),
-                            |value| format!("{value} dBm"),
-                        )
+                        .map_or_else(String::new, |value| format!("{value} dBm"))
                         .into(),
                 })
                 .collect::<Vec<_>>();
-            ui.set_devices(ModelRc::new(VecModel::from(devices)));
-            ui.set_status_line("Select a charger to connect".into());
+            let status = if devices.is_empty() {
+                "No chargers found; check the charger is powered and in range"
+            } else {
+                "Select a charger to connect"
+            };
+            set_device_list(ui, devices);
+            ui.set_status_line(status.into());
         }
         UiUpdate::Status(status) => set_status(&ui.as_weak(), &status),
         UiUpdate::Session(event) => match event {
@@ -274,15 +514,9 @@ fn apply_update(ui: &MainWindow, update: UiUpdate) {
                 ui.set_status_line("Lost connection; reconnecting...".into());
             }
             Event::SlotUpdated { slot, status } => {
-                let index = slot.index();
-                let existing_slots = ui.get_slots();
-                let mut slots = (0..existing_slots.row_count())
-                    .filter_map(|row| existing_slots.row_data(row))
-                    .collect::<Vec<_>>();
-                if let Some(slot_entry) = slots.get_mut(index) {
-                    *slot_entry = slot_info(slot, &status);
-                }
-                ui.set_slots(ModelRc::new(VecModel::from(slots)));
+                set_slot_row(ui, slot.index(), slot_info(slot, &status));
+                HISTORY.with_borrow_mut(|history| history.record(slot, &status, Instant::now()));
+                refresh_chart(ui);
                 if slot == Slot::Four {
                     let heartbeat = if ui.get_window_title().contains('•') {
                         "⁃"
@@ -500,6 +734,116 @@ fn set_status(ui: &slint::Weak<MainWindow>, text: &str) {
     }
 }
 
+fn chart_hidden(ui: &MainWindow) -> [bool; 4] {
+    let model = ui.get_chart_hidden();
+    std::array::from_fn(|index| model.row_data(index).unwrap_or(false))
+}
+
+fn set_y_range(
+    ui: &slint::Weak<MainWindow>,
+    range: impl FnOnce(&ChartState) -> Option<(f64, f64)>,
+) {
+    let Some(ui) = ui.upgrade() else {
+        return;
+    };
+    CHART.with(|chart| {
+        let state = chart.get();
+        chart.set(ChartState {
+            y_range: range(&state),
+            ..state
+        });
+    });
+    refresh_chart(&ui);
+}
+
+fn set_hover(ui: &slint::Weak<MainWindow>, hover: Option<(f64, f64)>) {
+    let Some(ui) = ui.upgrade() else {
+        return;
+    };
+    CHART.with(|chart| {
+        chart.set(ChartState {
+            hover,
+            ..chart.get()
+        });
+    });
+    let now = CHART.with(Cell::get).drawn_at.unwrap_or_else(Instant::now);
+    draw_chart(&ui, now);
+}
+
+fn refresh_chart(ui: &MainWindow) {
+    draw_chart(ui, Instant::now());
+}
+
+fn draw_chart(ui: &MainWindow, now: Instant) {
+    let metric = Metric::from_index(ui.get_chart_metric());
+    let mut state = CHART.with(Cell::get);
+    if state.metric != metric {
+        state.y_range = None;
+        state.metric = metric;
+    }
+    let view = ChartView {
+        window: history::time_window(ui.get_chart_window()),
+        y_range: state.y_range,
+        smoothing: Smoothing::from_index(ui.get_chart_smoothing()),
+    };
+    let hidden = chart_hidden(ui);
+    state.drawn_at = Some(now);
+    let size = (
+        f64::from(ui.get_plot_width()),
+        f64::from(ui.get_plot_height()),
+    );
+    let (chart, probe) = HISTORY.with_borrow(|history| {
+        (
+            history.chart(metric, hidden, view, now, size),
+            state
+                .hover
+                .and_then(|cursor| history.probe(metric, hidden, view, now, size, cursor)),
+        )
+    });
+    ui.set_chart_probe(probe.map_or_else(ChartProbe::default, |probe| {
+        let at = Local::now()
+            - Duration::try_from_secs_f64(probe.seconds_ago.max(0.0))
+                .ok()
+                .and_then(|ago| chrono::Duration::from_std(ago).ok())
+                .unwrap_or_default();
+        ChartProbe {
+            visible: true,
+            #[allow(clippy::cast_possible_truncation)]
+            x: probe.x as f32,
+            #[allow(clippy::cast_possible_truncation)]
+            y: probe.y as f32,
+            slot: i32::try_from(probe.slot).unwrap_or(0),
+            value: probe.value.into(),
+            smoothed: probe.smoothed.unwrap_or_default().into(),
+            time: at.format("%H:%M:%S").to_string().into(),
+        }
+    }));
+    ui.set_chart(ChartData {
+        paths: ModelRc::new(VecModel::from(
+            chart.paths.map(slint::SharedString::from).to_vec(),
+        )),
+        y_max: chart.y_max.into(),
+        y_mid: chart.y_mid.into(),
+        y_min: chart.y_min.into(),
+        x_start: chart.x_start.into(),
+        empty: chart.empty,
+    });
+    if !chart.empty {
+        state.shown = chart.range;
+    }
+    CHART.with(|cell| cell.set(state));
+    ui.set_chart_zoomed(state.y_range.is_some());
+}
+
+/// Updates one slot in place. Replacing the whole model would make Slint
+/// rebuild the slot tabs on every poll, dropping hover state and in-progress clicks.
+fn set_slot_row(ui: &MainWindow, index: usize, info: SlotInfo) {
+    let slots = ui.get_slots();
+    if index < slots.row_count() {
+        slots.set_row_data(index, info);
+    }
+}
+
 fn empty_slot_info(slot: Slot) -> SlotInfo {
     SlotInfo {
         title: format!("Slot {}", slot.index() + 1).into(),
@@ -539,28 +883,14 @@ fn slot_info(slot: Slot, status: &SlotStatus) -> SlotInfo {
     }
 }
 
+/// Compact `H:MM:SS` so the value fits the slot card's grid cell.
 fn format_duration(seconds: u32) -> String {
-    if seconds == 0 {
-        return "0 seconds".to_owned();
-    }
-    [
-        ("day", seconds / 86_400),
-        ("hour", (seconds % 86_400) / 3_600),
-        ("minute", (seconds % 3_600) / 60),
-        ("second", seconds % 60),
-    ]
-    .into_iter()
-    .filter(|(_, value)| *value > 0)
-    .take(2)
-    .map(|(unit, value)| {
-        if value == 1 {
-            format!("{value} {unit}")
-        } else {
-            format!("{value} {unit}s")
-        }
-    })
-    .collect::<Vec<_>>()
-    .join(" ")
+    format!(
+        "{}:{:02}:{:02}",
+        seconds / 3_600,
+        (seconds % 3_600) / 60,
+        seconds % 60
+    )
 }
 
 fn led_label(color: mc5000_protocol::LedColor) -> &'static str {

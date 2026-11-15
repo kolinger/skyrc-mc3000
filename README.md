@@ -26,12 +26,44 @@ chmod +x mc5000-gui-x86_64.AppImage
 ./mc5000-gui-x86_64.AppImage
 ```
 
-The GUI scans for chargers, lets you connect by selecting a scan result or
-entering its Bluetooth address, and remembers that address and the window size
-in `~/.config/mc5000/config.toml`. The Debug panel shows timestamped TX/RX
-frames, can pause or clear the display, exports frames to
+The GUI's header is a single row: pick a charger from the device dropdown
+(filled by **Scan**, showing name, MAC and RSSI) and press **Connect**. The last
+connected charger is pre-filled with its name and MAC, so reconnecting doesn't
+need a scan. **Enter MAC** swaps the dropdown for a manual address field. The
+charger's address and name and the window size are
+remembered in `~/.config/mc5000/config.toml`. The Debug panel shows timestamped
+TX/RX frames, can pause or clear the display, exports frames to
 `~/.config/mc5000/frames.txt`, and can send a raw hex frame.
 The UI uses a consistent dark palette regardless of the desktop's theme.
+
+Each slot card shows status, battery type and mode, followed by a compact grid
+of voltage, current, capacity, elapsed time, temperature and resistance. Below
+the cards, a history chart graphs voltage, current, temperature or capacity
+(chosen with the metric buttons) for all four slots. Samples are recorded once a
+second while a slot is active, and up to 6 hours are kept. The buttons under
+the chart pick the time window (All, or the last 1 min to 3 h). The y axis fits the visible
+data until you zoom it: use **−**/**+** or the mouse wheel over the plot (it
+zooms around the cursor), drag the plot to pan, and press **Auto** or
+double-click the plot to fit again. Two smoothing modes calm noisy or
+stair-stepped readings (click the active one again to turn it off):
+**Average** draws a moving average over 1/40 of the visible time span (at least
+5 s); **Spline** fits a smooth curve (a penalised cubic B-spline with knots
+every 1/20 of the visible span, at least 10 s) to each recorded run, which
+follows steady trends right up to "now" instead of lagging at the ends.
+Neither joins runs separated by a gap in recording. Hover over a line to see
+the exact reading and the time it was taken; while smoothing, the popup also
+shows the smoothed value. Click a slot in the legend, or the coloured bar on its
+slot card, to hide or show its line (the bar is outlined while hidden).
+**Export** saves everything captured so far as a CSV file, using the desktop's
+save dialog (starting in Documents). Each row is one slot reading:
+`timestamp,elapsed_s,slot,voltage_v,current_a,temperature_c,capacity_mah`,
+with local ISO 8601 timestamps. All slots and the full history are included, as
+measured: chart smoothing, hidden lines and the time window don't affect it.
+**Clear** discards the history.
+
+The window is freely resizable (minimum 520×600). Below 960 px wide the header
+wraps onto two rows and the four slot cards collapse into a single card with a
+tab per slot; each tab shows its slot's status LED.
 
 ## CLI
 
