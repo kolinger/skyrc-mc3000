@@ -204,6 +204,10 @@ component LegendItem inherits Rectangle {
 
 component MetricPills inherits HorizontalLayout {
     in-out property <int> metric;
+    // Expose the rendered position for interaction tests across font layouts.
+    in-out property <length> center-y;
+    changed absolute-position => { root.center-y = root.absolute-position.y + root.height / 2; }
+    changed height => { root.center-y = root.absolute-position.y + root.height / 2; }
     callback metric-selected(int);
     spacing: 6px;
     for name[index] in ["Voltage", "Current", "Capacity"]: Pill {
@@ -276,6 +280,7 @@ component HistoryChart inherits Rectangle {
     // Plot size in logical pixels; the paths are generated for exactly this size.
     out property <length> plot-width: plot.width;
     out property <length> plot-height: plot.height;
+    in-out property <length> metric-controls-y;
     background: #1c1f26;
     border-color: #2e333d;
     border-width: 1px;
@@ -289,6 +294,7 @@ component HistoryChart inherits Rectangle {
             spacing: 6px;
             MetricPills {
                 metric <=> root.metric;
+                center-y <=> root.metric-controls-y;
                 metric-selected(index) => { root.metric-selected(index); }
             }
             Rectangle { horizontal-stretch: 1; }
@@ -307,6 +313,7 @@ component HistoryChart inherits Rectangle {
             HorizontalLayout {
                 MetricPills {
                     metric <=> root.metric;
+                    center-y <=> root.metric-controls-y;
                     metric-selected(index) => { root.metric-selected(index); }
                 }
                 Rectangle { horizontal-stretch: 1; }
@@ -595,6 +602,7 @@ export component MainWindow inherits Window {
     in-out property <int> chart-smoothing: 0;
     out property <float> plot-width: chart-view.plot-width / 1px;
     out property <float> plot-height: chart-view.plot-height / 1px;
+    out property <float> chart-header-center-y: chart-view.metric-controls-y / 1px;
     changed plot-width => { root.chart-changed(); }
     changed plot-height => { root.chart-changed(); }
     // Slot shown when the window is too narrow for all four cards side by side.

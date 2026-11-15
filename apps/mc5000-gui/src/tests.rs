@@ -56,6 +56,11 @@ fn click(window: &slint::Window, x: f32, y: f32) {
     });
 }
 
+// The header's position varies with font metrics.
+fn click_chart_header(ui: &MainWindow, x: f32) {
+    click(ui.window(), x, ui.get_chart_header_center_y());
+}
+
 fn charger(name: &str, address: &str) -> ChargerDevice {
     ChargerDevice {
         name: name.into(),
@@ -251,7 +256,7 @@ fn history_chart_plots_and_toggles_slots(window: &Rc<MinimalSoftwareWindow>, ui:
     assert!(count_orange(window, 800..1090) > 20, "chart reaches 'now'");
 
     // Metric pills sit in the chart header: Voltage, Current, ...
-    click(ui.window(), 129.0, 306.0);
+    click_chart_header(ui, 129.0);
     assert_eq!(ui.get_chart_metric(), 1);
 
     // The coloured bar on a slot card toggles that slot's line too.
@@ -272,19 +277,19 @@ fn history_chart_plots_and_toggles_slots(window: &Rc<MinimalSoftwareWindow>, ui:
     chart_zoom_and_time_window(window, ui);
     hovering_a_line_shows_its_value(window, ui);
 
-    click(ui.window(), 1066.0, 309.0);
+    click_chart_header(ui, 1066.0);
     assert!(ui.get_chart().empty, "Clear empties the chart");
     // With nothing captured, Export says so instead of opening a save dialog.
-    click(ui.window(), EXPORT.0, EXPORT.1);
+    click_chart_header(ui, EXPORT);
     assert_eq!(ui.get_status_line(), "No captured data to export yet");
 }
 
 // Chart header controls in the 1120x760 window.
-const ZOOM_IN: (f32, f32) = (885.0, 306.0);
-const AUTO_FIT: (f32, f32) = (932.0, 306.0);
-const AVERAGE: (f32, f32) = (721.0, 306.0);
-const SPLINE: (f32, f32) = (788.0, 306.0);
-const EXPORT: (f32, f32) = (1003.0, 309.0);
+const ZOOM_IN: f32 = 885.0;
+const AUTO_FIT: f32 = 932.0;
+const AVERAGE: f32 = 721.0;
+const SPLINE: f32 = 788.0;
+const EXPORT: f32 = 1003.0;
 // Legend and time window presets below the plot.
 const LEGEND_SLOT_2: (f32, f32) = (570.0, 690.0);
 const ALL_HISTORY: (f32, f32) = (392.0, 719.0);
@@ -328,16 +333,16 @@ fn shown_range() -> (f64, f64) {
 
 fn chart_zoom_and_time_window(window: &MinimalSoftwareWindow, ui: &MainWindow) {
     // Back to voltage: 1.2 V .. 1.5 V over the last ten minutes.
-    click(ui.window(), 58.0, 306.0);
+    click_chart_header(ui, 58.0);
     render(window);
     let (low, high) = shown_range();
     assert!(!ui.get_chart_zoomed());
 
-    click(ui.window(), ZOOM_IN.0, ZOOM_IN.1);
+    click_chart_header(ui, ZOOM_IN);
     assert!(ui.get_chart_zoomed(), "+ zooms the y axis in");
     let (zoomed_low, zoomed_high) = shown_range();
     assert!((zoomed_high - zoomed_low) < (high - low) * 0.9);
-    click(ui.window(), AUTO_FIT.0, AUTO_FIT.1);
+    click_chart_header(ui, AUTO_FIT);
     assert!(!ui.get_chart_zoomed(), "Auto fits the data again");
     assert_eq!(shown_range(), (low, high));
 
@@ -364,15 +369,15 @@ fn chart_zoom_and_time_window(window: &MinimalSoftwareWindow, ui: &MainWindow) {
         button: PointerEventButton::Left,
     });
     assert!(shown_range().0 > before.0, "dragging down pans upwards");
-    click(ui.window(), AUTO_FIT.0, AUTO_FIT.1);
+    click_chart_header(ui, AUTO_FIT);
 
     // Smoothing modes are exclusive; clicking the active one turns it off.
-    click(ui.window(), AVERAGE.0, AVERAGE.1);
+    click_chart_header(ui, AVERAGE);
     assert_eq!(ui.get_chart_smoothing(), 1, "Average smooths");
-    click(ui.window(), SPLINE.0, SPLINE.1);
+    click_chart_header(ui, SPLINE);
     assert_eq!(ui.get_chart_smoothing(), 2, "Spline replaces Average");
     assert!(!ui.get_chart().empty);
-    click(ui.window(), SPLINE.0, SPLINE.1);
+    click_chart_header(ui, SPLINE);
     assert_eq!(ui.get_chart_smoothing(), 0);
 
     // A one-minute window shows only the last minute of the ten recorded.
