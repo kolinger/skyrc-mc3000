@@ -1,0 +1,21 @@
+[package]
+name = "mc5000-ble"
+description = "BLE transport for the SkyRC MC5000 (scan, connect, request/response, raw frame tap)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+btleplug = "0.11"
+futures-util = "0.3"
+mc5000-protocol = { path = "../mc5000-protocol" }
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+tracing = "0.1"
+uuid = "1"
+
+[lints]
+workspace = true

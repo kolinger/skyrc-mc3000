@@ -1,0 +1,91 @@
+{
+	"folders": [
+		{
+			"name": "skyrc-mc5000",
+			"path": "."
+		}
+	],
+	"settings": {
+		"rust-analyzer.check.command": "clippy",
+		"rust-analyzer.cargo.targetDir": true,
+		"[rust]": {
+			"editor.defaultFormatter": "rust-lang.rust-analyzer",
+			"editor.formatOnSave": true
+		},
+		"[slint]": {
+			"editor.defaultFormatter": "Slint.slint",
+			"editor.formatOnSave": true
+		},
+		"[toml]": {
+			"editor.defaultFormatter": "tamasfe.even-better-toml"
+		},
+		"files.insertFinalNewline": true,
+		"files.trimTrailingWhitespace": true,
+		"files.watcherExclude": {
+			"**/target/**": true
+		},
+		"search.exclude": {
+			"**/target": true,
+			"Cargo.lock": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"Slint.slint",
+			"vadimcn.vscode-lldb",
+			"tamasfe.even-better-toml"
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "cargo build",
+				"type": "shell",
+				"command": "cargo build --workspace",
+				"group": { "kind": "build", "isDefault": true },
+				"problemMatcher": ["$rustc"]
+			},
+			{
+				"label": "cargo test",
+				"type": "shell",
+				"command": "cargo test --workspace",
+				"group": { "kind": "test", "isDefault": true },
+				"problemMatcher": ["$rustc"]
+			},
+			{
+				"label": "cargo clippy",
+				"type": "shell",
+				"command": "cargo clippy --workspace --all-targets -- -D warnings",
+				"problemMatcher": ["$rustc"]
+			},
+			{
+				"label": "cargo fmt",
+				"type": "shell",
+				"command": "cargo fmt --all",
+				"problemMatcher": []
+			},
+			{
+				"label": "run CLI",
+				"type": "shell",
+				"command": "cargo run -p mc5000-cli -- ${input:cliArgs}",
+				"problemMatcher": ["$rustc"]
+			},
+			{
+				"label": "run GUI",
+				"type": "shell",
+				"command": "cargo run -p mc5000-gui",
+				"problemMatcher": ["$rustc"]
+			}
+		],
+		"inputs": [
+			{
+				"id": "cliArgs",
+				"type": "promptString",
+				"description": "mc5000 CLI arguments",
+				"default": "--help"
+			}
+		]
+	}
+}

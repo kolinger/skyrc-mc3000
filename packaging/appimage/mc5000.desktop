@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SkyRC MC5000 Monitor
+Comment=Monitor a SkyRC MC5000 battery charger over Bluetooth
+Exec=mc5000-gui
+Icon=mc5000
+Terminal=false
+Categories=Utility;Electronics;
+StartupWMClass=mc5000-gui

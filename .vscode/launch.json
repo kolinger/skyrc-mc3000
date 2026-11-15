@@ -1,0 +1,59 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug GUI",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": ["build", "--package=mc5000-gui", "--bin=mc5000-gui"],
+				"env": { "PATH": "${env:PATH}:${env:HOME}/.cargo/bin" }
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}",
+			"env": { "RUST_BACKTRACE": "1" }
+		},
+		{
+			"name": "Debug CLI",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": ["build", "--package=mc5000-cli", "--bin=mc5000"],
+				"env": { "PATH": "${env:PATH}:${env:HOME}/.cargo/bin" }
+			},
+			"args": "${input:cliArgs}",
+			"cwd": "${workspaceFolder}",
+			"env": { "RUST_BACKTRACE": "1" }
+		},
+		{
+			"name": "Debug protocol tests",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": ["test", "--no-run", "--lib", "--package=mc5000-protocol"],
+				"env": { "PATH": "${env:PATH}:${env:HOME}/.cargo/bin" }
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"name": "Debug core tests",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": ["test", "--no-run", "--lib", "--package=mc5000-core"],
+				"env": { "PATH": "${env:PATH}:${env:HOME}/.cargo/bin" }
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	],
+	"inputs": [
+		{
+			"id": "cliArgs",
+			"type": "promptString",
+			"description": "mc5000 CLI arguments",
+			"default": "--help"
+		}
+	]
+}

@@ -1,0 +1,184 @@
+import { Button, CheckBox, LineEdit, Palette, ScrollView } from "std-widgets.slint";
+
+export { Palette }
+
+export struct ChargerDevice {
+    name: string,
+    address: string,
+    rssi: string,
+}
+
+export struct SlotInfo {
+    title: string,
+    battery-type: string,
+    mode: string,
+    status: string,
+    voltage: string,
+    current: string,
+    capacity: string,
+    time: string,
+    temperature: string,
+    resistance: string,
+    led: string,
+}
+
+export struct FrameInfo {
+    summary: string,
+    detail: string,
+}
+
+component SlotCard inherits Rectangle {
+    in property <SlotInfo> info;
+    background: #1c1f26;
+    border-color: #2e333d;
+    border-width: 1px;
+    border-radius: 10px;
+    min-width: 220px;
+    min-height: 220px;
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 6px;
+        HorizontalLayout {
+            Text {
+                text: info.title;
+                font-size: 20px;
+                font-weight: 700;
+                color: #e6e9ef;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Rectangle {
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                background: info.led == "red" ? #e34f4f : info.led == "green" ? #32a76a : #4a505c;
+            }
+        }
+        Text {
+            text: info.status;
+            font-size: 16px;
+            font-weight: 600;
+            color: info.led == "red" ? #ff6b6b : info.led == "green" ? #4ade80 : #c9ced8;
+        }
+        Text { text: info.battery-type + "  /  " + info.mode; color: #9aa3b2; }
+        Rectangle { height: 1px; background: #2e333d; }
+        HorizontalLayout { Text { text: "Voltage"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.voltage; color: #e6e9ef; } }
+        HorizontalLayout { Text { text: "Current"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.current; color: #e6e9ef; } }
+        HorizontalLayout { Text { text: "Capacity"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.capacity; color: #e6e9ef; } }
+        HorizontalLayout { Text { text: "Time"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.time; color: #e6e9ef; } }
+        HorizontalLayout { Text { text: "Temperature"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.temperature; color: #e6e9ef; } }
+        HorizontalLayout { Text { text: "Resistance"; color: #9aa3b2; } Rectangle { horizontal-stretch: 1; } Text { text: info.resistance; color: #e6e9ef; } }
+    }
+}
+
+export component MainWindow inherits Window {
+    // Keep standard widgets consistent with the fixed dark backgrounds.
+    init => { Palette.color-scheme = ColorScheme.dark; }
+
+    in-out property <string> window-title: "MC5000 Monitor";
+    title: root.window-title;
+    width: 1120px;
+    height: 760px;
+    background: #121418;
+
+    in-out property <string> address: "";
+    in-out property <string> status-line: "Select a charger to connect";
+    in-out property <string> command-hex: "";
+    in-out property <bool> debug-visible: false;
+    in-out property <bool> frames-paused: false;
+    in property <[ChargerDevice]> devices: [];
+    in property <[SlotInfo]> slots: [];
+    in property <[FrameInfo]> frames: [];
+
+    callback scan();
+    callback connect(string);
+    callback send(string);
+    callback clear-frames();
+    callback export-frames();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            VerticalLayout {
+                spacing: 2px;
+                Text { text: "SkyRC MC5000"; font-size: 24px; font-weight: 700; color: #e6e9ef; }
+                Text { text: root.status-line; color: #9aa3b2; }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Button { text: "Scan"; clicked => { root.scan(); } }
+            CheckBox {
+                text: "Debug";
+                checked: root.debug-visible;
+                toggled => { root.debug-visible = self.checked; }
+            }
+        }
+
+        HorizontalLayout {
+            LineEdit {
+                text: root.address;
+                placeholder-text: "Bluetooth address";
+                edited => { root.address = self.text; }
+            }
+            Button { text: "Connect"; clicked => { root.connect(root.address); } }
+        }
+
+        if root.devices.length > 0 : ScrollView {
+            height: 90px;
+            VerticalLayout {
+                for device in root.devices: Button {
+                    text: device.name + "  (" + device.address + ", " + device.rssi + ")";
+                    clicked => { root.connect(device.address); }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            for slot in root.slots: SlotCard { info: slot; }
+        }
+
+        if root.debug-visible : Rectangle {
+            background: #1c1f26;
+            border-color: #2e333d;
+            border-width: 1px;
+            border-radius: 8px;
+            vertical-stretch: 1;
+            min-height: 140px;
+            VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+                HorizontalLayout {
+                    Text { text: "BLE frame log"; font-size: 16px; font-weight: 600; color: #e6e9ef; }
+                    Rectangle { horizontal-stretch: 1; }
+                    CheckBox {
+                        text: "Pause";
+                        checked: root.frames-paused;
+                        toggled => { root.frames-paused = self.checked; }
+                    }
+                    Button { text: "Clear"; clicked => { root.clear-frames(); } }
+                    Button { text: "Export"; clicked => { root.export-frames(); } }
+                }
+                HorizontalLayout {
+                    LineEdit {
+                        text: root.command-hex;
+                        placeholder-text: "Hex frame to send";
+                        edited => { root.command-hex = self.text; }
+                    }
+                    Button { text: "Send raw"; clicked => { root.send(root.command-hex); } }
+                }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        for frame in root.frames: Text {
+                            text: frame.summary + "  " + frame.detail;
+                            font-family: "monospace";
+                            color: #c9ced8;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

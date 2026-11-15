@@ -1,0 +1,19 @@
+[package]
+name = "mc5000-core"
+description = "Charger session logic for the SkyRC MC5000: polling, command queue, state model and events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+mc5000-ble = { path = "../mc5000-ble" }
+mc5000-protocol = { path = "../mc5000-protocol" }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+tracing = "0.1"
+
+[lints]
+workspace = true

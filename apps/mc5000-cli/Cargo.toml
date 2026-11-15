@@ -1,0 +1,25 @@
+[package]
+name = "mc5000-cli"
+description = "Command-line monitor and protocol reverse-engineering tool for the SkyRC MC5000"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "mc5000"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+mc5000-ble = { path = "../../crates/mc5000-ble" }
+mc5000-core = { path = "../../crates/mc5000-core" }
+mc5000-protocol = { path = "../../crates/mc5000-protocol" }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[lints]
+workspace = true

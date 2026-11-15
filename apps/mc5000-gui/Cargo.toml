@@ -1,0 +1,36 @@
+[package]
+name = "mc5000-gui"
+description = "Desktop monitor for the SkyRC MC5000"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "mc5000-gui"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = true }
+directories = "6"
+mc5000-ble = { path = "../../crates/mc5000-ble" }
+mc5000-core = { path = "../../crates/mc5000-core" }
+mc5000-protocol = { path = "../../crates/mc5000-protocol" }
+notify-rust = "4"
+serde = { version = "1", features = ["derive"] }
+slint = { version = "1.14", default-features = false, features = ["std", "backend-winit", "renderer-femtovg", "compat-1-18"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[lints]
+workspace = true
+
+[build-dependencies]
+slint-build = "1.14"
+
+[dev-dependencies]
+slint = { version = "1.14", default-features = false, features = ["renderer-software"] }
