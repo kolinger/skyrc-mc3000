@@ -97,7 +97,18 @@ unknown nonzero error displays `ERROR`.
 
 ## Open capture questions
 
-- Is the leading response byte at offset 3 a slot identifier?
+- Is the leading response byte at offset 3 a slot identifier? In one live
+  capture, it matched the requested slot mask (`01`, `02`, `04`, or `08`) in
+  all 100 replies observed while slots 1 and 2 were active and slots 3 and 4
+  were empty. This is not enough to establish the meaning across charger
+  states or firmware versions. Capture more exchanges, including different
+  slot states, and verify the byte before using it to correlate responses.
+- Can a reply arrive after the next slot's request has already been sent? The
+  current pre-request queue drain cannot catch that timing, and command-only
+  matching can attribute the delayed `0x91` reply to the wrong slot. Once the
+  leading byte is verified, use it to reject mismatched slot replies and add a
+  regression test for a late reply arriving after the following request. If
+  it is not reliable, investigate another resynchronization strategy.
 - Are responses ever longer than 22 data bytes, and what do trailing bytes mean?
 - Which additional command bytes configure slot/system settings? Record each
   capture with its direction, command, exact payload, checksum and context.

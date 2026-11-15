@@ -6,6 +6,14 @@ desktop UI and a command-line tool for monitoring and protocol investigation.
 This project now targets the MC5000 only; the previous Python MC3000/MC5000
 monitor and MC3000 USB profile tools have been removed.
 
+## Beta
+
+The Rust/Slint port is in beta. It replaces the previous Python application and
+supports MC5000 monitoring on Linux; MC3000 monitoring and USB profile tools
+are not included. See the [changelog](CHANGELOG.md) for the beta changes and
+the [known slot-status limitation](#beta-limitation-late-slot-status-replies)
+before relying on captured readings.
+
 ## Linux requirements
 
 - BlueZ must be running and a Bluetooth adapter must be available.
@@ -18,8 +26,8 @@ monitor and MC3000 USB profile tools have been removed.
 
 ## Run
 
-Download the `mc5000-gui` AppImage from the GitHub release, make it executable,
-and launch it:
+Download the `mc5000-gui` AppImage from the GitHub releases page (including
+pre-releases for beta versions), make it executable, and launch it:
 
 ```sh
 chmod +x mc5000-gui-x86_64.AppImage
@@ -65,6 +73,24 @@ measured: chart smoothing, hidden lines and the time window don't affect it.
 The window is freely resizable (minimum 520×600). Below 960 px wide the header
 wraps onto two rows and the four slot cards collapse into a single card with a
 tab per slot; each tab shows its slot's status LED.
+
+### Beta limitation: late slot-status replies
+
+A delayed Bluetooth reply can occasionally be displayed under the wrong slot.
+All slot-status requests use command `0x91`, so a reply arriving after the next
+slot's request is sent cannot currently be distinguished by command alone. The
+transport drops notifications already queued before each request, but this
+does not cover a reply that arrives later.
+
+In one live capture, the response's leading byte matched the requested slot
+mask (`01`, `02`, `04`, or `08`) in all 100 observed replies. Its meaning is
+not yet confirmed across charger states or firmware versions, so the monitor
+does not rely on it for slot assignment. The next step is to verify that byte
+against additional captures and then reject replies whose confirmed slot
+identifier does not match the outstanding request. Add a regression test where
+a delayed reply arrives after the next request is sent; if the byte is not a
+reliable identifier, implement and test another response-resynchronization
+strategy before removing this beta limitation.
 
 ## CLI
 
